@@ -1,0 +1,20 @@
+body:
+  - type: input
+    attributes:
+      name: username
+      label: 'Default Username:'
+      defaultValue: null
+  - type: passwordBox
+    attributes:
+      name: token
+      label: 'Personal access token:'
+      defaultValue: ""
+      description: Github.com Personal access token
+  - type: dropdown
+    attributes:
+      name: default_action
+      label: 'Default Action:'
+      defaultValue: 'Open in browser'
+      options:
+        - 'Open in Browser'
+        - 'Open in Desktop Application'
