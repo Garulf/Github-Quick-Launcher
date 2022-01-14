@@ -33,7 +33,6 @@ class GithubQuickLauncher(Flox):
         if self.token:
             user = self.gh.get_user()
         elif self.username != "" and self.username is not None:
-            self.logger.warning(self.username)
             user = self.gh.get_user(self.settings.get('username'))
         elif query.startswith(USER_KEY) and len(query) > 1:
             query = query[1:]
