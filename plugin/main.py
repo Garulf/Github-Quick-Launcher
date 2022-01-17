@@ -9,9 +9,11 @@ from github.GithubException import RateLimitExceededException, BadCredentialsExc
 
 GITHUB_BASE_URL = "https://github.com/"
 GITHUB_URI = 'x-github-client://openRepo/'
-USER_KEY = '@'
+USER_KEY = '/'
 STAR_KEY = '*'
 KEYS = [USER_KEY, STAR_KEY]
+RESULT_LIMIT = 100
+SEARCH_LIMIT = 10
 STAR_GLYPH = ''
 REPO_GLYPH = ''
 FORK_GLYPH = ''
@@ -29,26 +31,26 @@ class GithubQuickLauncher(Flox):
     def get_user_stars(self, query):
         return self.gh.get_user().get_starred()
 
+    def search_repos(self, query):
+        return self.gh.search_repositories(query)
+
     def get_user_repos(self, query):
-        if self.token:
+        if USER_KEY in query:
+            user, query = query.split(USER_KEY)
+            user = self.gh.get_user(user)
+        elif self.token:
             user = self.gh.get_user()
-        elif self.username != "" and self.username is not None:
-            user = self.gh.get_user(self.settings.get('username'))
-        elif query.startswith(USER_KEY) and len(query) > 1:
-            query = query[1:]
-            username = query.split(' ')[0]
-            query = query.replace(username, '')
-            user = self.gh.get_user(username)
-        elif len(query) > 1:
-            user = self.gh.get_user(query.split('/')[0])
+        elif self.username:
+            user = self.gh.get_user(self.username)
         else:
             return []
         return user.get_repos()
 
-    def results(self, query, repos: list, default_glyph: str=REPO_GLYPH):
+    def results(self, query, repos: list, default_glyph: str=REPO_GLYPH, **kwargs):
+        limit = kwargs.pop('limit', RESULT_LIMIT)
         self.font_family = "#octicons"
         query = strip_keywords(query, KEYS)
-        for repo in repos:
+        for idx, repo in enumerate(repos):
             glyph = default_glyph
             if query.lower() in repo.full_name.lower():
                 if repo.fork and default_glyph != STAR_GLYPH:
@@ -61,6 +63,8 @@ class GithubQuickLauncher(Flox):
                     parameters=[repo.full_name],
                     context=[repo.full_name]
             )
+            if idx == limit:
+                break
         return self._results
 
     def query(self, query):
@@ -74,6 +78,9 @@ class GithubQuickLauncher(Flox):
             else:
                 repos = self.get_user_repos(query)
                 self.results(query, repos)
+            if len(self._results) == 0:
+                repos = self.search_repos(query)
+                self.results(query, repos, STAR_GLYPH, limit=SEARCH_LIMIT)
         except RateLimitExceededException:
             self.add_item(
                 title='Github Rate Limit Exceeded',
