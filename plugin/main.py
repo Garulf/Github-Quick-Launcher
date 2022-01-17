@@ -80,7 +80,7 @@ class GithubQuickLauncher(Flox):
                 self.results(query, repos)
             if len(self._results) == 0 and query != '':
                 repos = self.search_repos(query)
-                self.results(query, repos, STAR_GLYPH, limit=SEARCH_LIMIT)
+                self.results(query, repos, limit=SEARCH_LIMIT)
         except RateLimitExceededException:
             self.add_item(
                 title='Github Rate Limit Exceeded',
