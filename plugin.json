@@ -1,10 +1,10 @@
 {
     "ID": "240B648F33DD4105800747A2749E1B5C",
-    "ActionKeyword": "gq",
+    "ActionKeyword": "gr",
     "Name": "Github Quick Launcher",
     "Description": "Quickly access your personal repositories and stars.",
     "Author": "Garulf",
-    "Version": "0.0.1",
+    "Version": "1.0.0",
     "Language": "python",
     "Website": "https://github.com/Garulf/github-quick-launcher",
     "IcoPath": "./icon.png",
