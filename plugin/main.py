@@ -75,7 +75,7 @@ class GithubQuickLauncher(Flox):
             if self.settings.get('token', None) is not None and query.startswith(STAR_KEY):
                 stars = self.get_user_stars(query)
                 self.results(query, stars, STAR_GLYPH)
-            else:
+            elif not query.startswith(USER_KEY):
                 repos = self.get_user_repos(query)
                 self.results(query, repos)
             if len(self._results) == 0 and query != '':
