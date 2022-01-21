@@ -29,7 +29,7 @@ Simply type a valid username and a `/` at the end.
 </details>
 
 #### Search Github:
-Any term that doesnt match any results for `Default Username` or `Personal Access Token` owned repositories will search Github.com for repositories.
+Any term that doesnt match any results for `Default Username` or `Personal Access Token` owned repositories will search Github.com for repositories. You can now start your query with a forward slash `/` to search by repo name. Example: `/flow.launcher`
 <details>
 <summary>Show screenshot</summary>
 
