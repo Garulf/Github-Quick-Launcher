@@ -35,7 +35,7 @@ jobs:
         run: |
           $release_ver = (Invoke-WebRequest -Uri "https://raw.githubusercontent.com/${{github.repository}}/main/plugin.json" | ConvertFrom-Json).Version
           $release_ver = $release_ver -replace "v", "" 
-          $this_ver = "${{steps.version.outputs.prop}}"
+          $this_ver = "1.3.0"
           echo "This version:" $this_ver
           echo "Release version:" $release_ver
           if ([System.Version]$this_ver -gt [System.Version]$release_ver) {
