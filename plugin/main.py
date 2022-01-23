@@ -1,11 +1,11 @@
 import json
 from pathlib import Path
 
-from flox import Flox, utils, ICON_BROWSER, ICON_OPEN
+from flox import Flox, utils, ICON_BROWSER, ICON_OPEN, ICON_WARNING
 from utils import strip_keywords
 
 from github import Github
-from github.GithubException import RateLimitExceededException, BadCredentialsException, UnknownObjectException
+from github.GithubException import RateLimitExceededException, BadCredentialsException, UnknownObjectException, GithubException
 
 GITHUB_BASE_URL = "https://github.com/"
 GITHUB_URI = 'x-github-client://openRepo/'
@@ -93,6 +93,21 @@ class GithubQuickLauncher(Flox):
             )
         except UnknownObjectException:
             pass
+        except GithubException as e:
+            self.logger.error(e)
+            if e.status == 401:
+                self.add_item(
+                    title='API requires Authentication',
+                    subtitle='Please provide an access token in settings.',
+                    icon=ICON_WARNING,
+                    method=self.open_setting_dialog
+                )
+            else:
+                self.add_item(
+                    title='Github API Error',
+                    subtitle=f'{e.data["message"]}',
+                    icon=ICON_WARNING
+                )
         if self._results == []:
             self.add_item(
                 title='No results found',
