@@ -26,11 +26,21 @@ jobs:
         with:
           path: ${{github.event.repository.name}}
       - name: Get Plugin's version
-        id: Version
+        id: version
         uses: notiz-dev/github-action-json-property@release
         with: 
           path: './${{github.event.repository.name}}/plugin.json'
-          prop_path: 'version'
+          prop_path: 'Version'
+      - name: Assert Version updated
+        run: |
+          $release_ver = (Invoke-WebRequest -Uri "https://raw.githubusercontent.com/${{github.repository}}/main/plugin.json" | ConvertFrom-Json).Version
+          $release_ver = $release_ver -replace "v", "" 
+          $this_ver = ${{steps.version.outputs.prop}}
+          if ([version]$this_ver -gt [version]$release_ver) {
+            exit 0
+          } else {
+            exit 1
+          }
       - name: Get latest Version tag
         run: |
           if ("${{matrix.flow_tags}}" -eq 'latest') {
