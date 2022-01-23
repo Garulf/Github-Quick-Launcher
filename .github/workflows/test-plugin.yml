@@ -26,7 +26,7 @@ jobs:
         with:
           path: ${{github.event.repository.name}}
       - name: Get Plugin's version
-        id: version
+        id: Version
         uses: notiz-dev/github-action-json-property@release
         with: 
           path: './${{github.event.repository.name}}/plugin.json'
