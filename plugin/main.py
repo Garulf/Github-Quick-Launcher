@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from flox import Flox, utils, ICON_BROWSER, ICON_OPEN, ICON_WARNING
+from flox import Flox, utils, ICON_BROWSER, ICON_OPEN, ICON_WARNING, ICON_CANCEL
 from utils import strip_keywords
 
 from github import Github
@@ -114,7 +114,7 @@ class GithubQuickLauncher(Flox):
             self.add_item(
                 title='No results found',
                 subtitle='Please double check your query.',
-                icon=ICON_WARNING
+                icon=ICON_CANCEL
             )
 
     def context_menu(self, data):
