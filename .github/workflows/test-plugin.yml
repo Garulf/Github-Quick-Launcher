@@ -25,6 +25,12 @@ jobs:
         uses: actions/checkout@v2
         with:
           path: ${{github.event.repository.name}}
+      - name: Get Plugin's version
+        id: version
+        uses: notiz-dev/github-action-json-property@release
+        with: 
+          path: './plugin.json'
+          prop_path: 'version'
       - name: Get latest Version tag
         run: |
           if ("${{matrix.flow_tags}}" -eq 'latest') {
