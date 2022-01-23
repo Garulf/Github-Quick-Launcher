@@ -10,6 +10,15 @@ pm install github quick launcher
 |-----------------------|---------|-------------------------------------------------------------------------------------------------|
 | Default Username      | None    | Providing a default User will bring up that username's public repositories                      |
 | Personal Access Token | None    | Providing a Personal Access Token helps with rate limiting and uses key owner as default user.  |
+## Personal Access Token:
+No special access should be required, but if you allow `read:org` the plugin will also include all repositiories from Organizations you are a part of.
+<details>
+<summary>Show screenshot</summary>
+
+![image](https://user-images.githubusercontent.com/535299/150702194-47d85f6e-8270-4a63-8c72-ba13cc57c93f.png)
+</details>
+
+
 ## Usage:
 #### Search Starred repositories:
 Type `*` at the beginning of your query to search your `Default Username` or `Personal Access Token` starred repositoires.
