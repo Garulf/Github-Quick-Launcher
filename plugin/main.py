@@ -84,12 +84,14 @@ class GithubQuickLauncher(Flox):
         except RateLimitExceededException:
             self.add_item(
                 title='Github Rate Limit Exceeded',
-                subtitle='You can avoid this by providing an access token in settings.'
+                subtitle='You can avoid this by providing an access token in settings.',
+                icon=ICON_WARNING
             )
         except BadCredentialsException:
             self.add_item(
                 title='Bad Credentials',
-                subtitle='Please double check you Access Token in settings.'
+                subtitle='Please double check you Access Token in settings.',
+                icon=ICON_WARNING
             )
         except UnknownObjectException:
             pass
@@ -111,7 +113,8 @@ class GithubQuickLauncher(Flox):
         if self._results == []:
             self.add_item(
                 title='No results found',
-                subtitle='Please double check your query.'
+                subtitle='Please double check your query.',
+                icon=ICON_WARNING
             )
 
     def context_menu(self, data):
