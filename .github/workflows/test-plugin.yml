@@ -29,7 +29,7 @@ jobs:
         id: version
         uses: notiz-dev/github-action-json-property@release
         with: 
-          path: './plugin.json'
+          path: './${{github.event.repository.name}}/plugin.json'
           prop_path: 'version'
       - name: Get latest Version tag
         run: |
