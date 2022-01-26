@@ -20,7 +20,8 @@ FORK_GLYPH = ''
 
 class GithubQuickLauncher(Flox):
 
-    def init_github(self):
+    def __init__(self):
+        super().__init__()
         self.token = self.settings.get('token', None)
         self.username = self.settings.get('username', None)
         if self.token is not None and self.token != "":
@@ -69,7 +70,6 @@ class GithubQuickLauncher(Flox):
 
     def query(self, query):
         try:
-            self.init_github()
             repos = []
             stars = []
             if self.settings.get('token', None) is not None and query.startswith(STAR_KEY):
