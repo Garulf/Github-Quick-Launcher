@@ -77,6 +77,7 @@ class GithubQuickLauncher(Flox):
                     glyph=USER_GLYPH,
                     method=self.change_query,
                     parameters=[f'{self.user_keyword} {result.login}{USER_KEY}'],
+                    context=[result.login],
                     dont_hide=True
                 )
             if idx == limit:
@@ -138,21 +139,22 @@ class GithubQuickLauncher(Flox):
 
     def context_menu(self, data):
         if data != {}:
-            repo_fullname = data[0]
+            sub_dir = data[0]
             self.add_item(
                 title='Open in Browser',
-                subtitle=f"Open {repo_fullname} in Browser.",
+                subtitle=f"Open {sub_dir} in Browser.",
                 icon=ICON_BROWSER,
                 method=self.open_in_browser,
-                parameters=[repo_fullname]
+                parameters=[sub_dir]
             )
-            self.add_item(
-                title='Open Desktop Application',
-                subtitle=f"Open {repo_fullname} in Desktop Application.",
-                icon=ICON_OPEN,
-                method=self.open_in_app,
-                parameters=[repo_fullname]
-            )
+            if '/' in sub_dir:
+                self.add_item(
+                    title='Open Desktop Application',
+                    subtitle=f"Open {sub_dir} in Desktop Application.",
+                    icon=ICON_OPEN,
+                    method=self.open_in_app,
+                    parameters=[sub_dir]
+                )
 
     def default_action(self, repo_fullname):
         action = self.settings.get('default_action', 'Open in Browser')
