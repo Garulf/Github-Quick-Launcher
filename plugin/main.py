@@ -77,7 +77,6 @@ class GithubQuickLauncher(Flox):
                     glyph=USER_GLYPH,
                     method=self.change_query,
                     parameters=[f'{self.user_keyword} {result.login}{USER_KEY}'],
-                    context=[],
                     dont_hide=True
                 )
             if idx == limit:
@@ -87,20 +86,20 @@ class GithubQuickLauncher(Flox):
     def query(self, query):
         self.font_family = "#octicons"
         try:
-            repos = []
-            stars = []
+            results = []
             if self.settings.get('token', None) is not None and query.startswith(STAR_KEY):
-                stars = self.get_user_stars(query)
-                self.results(query, stars, STAR_GLYPH)
+                results = self.get_user_stars(query)
+                self.results(query, results, STAR_GLYPH)
             elif query.startswith(SEARCH_USER_KEY):
-                users = self.gh.search_users(query=query.replace(SEARCH_USER_KEY, ''))
-                self.results(query, users, USER_GLYPH)
+                if query != SEARCH_USER_KEY:
+                    results = self.gh.search_users(query=query.replace(SEARCH_USER_KEY, ''))
+                self.results(query, results, USER_GLYPH)
             elif not query.startswith(USER_KEY):
-                repos = self.get_user_repos(query)
-                self.results(query, repos)
+                results = self.get_user_repos(query)
+                self.results(query, results, dont_filter=True)
             if len(self._results) == 0 and query != '':
-                repos = self.search_repos(query)
-                self.results(query, repos, limit=SEARCH_LIMIT)
+                results = self.search_repos(query)
+                self.results(query, results, limit=SEARCH_LIMIT, dont_filter=True)
         except RateLimitExceededException:
             self.add_item(
                 title='Github Rate Limit Exceeded',
