@@ -4,23 +4,26 @@ from pathlib import Path
 from flox import Flox, utils, ICON_BROWSER, ICON_OPEN, ICON_WARNING, ICON_CANCEL
 from utils import strip_keywords
 
-from github import Github
+from github import Github, NamedUser, Repository
 from github.GithubException import RateLimitExceededException, BadCredentialsException, UnknownObjectException, GithubException
 
 GITHUB_BASE_URL = "https://github.com/"
 GITHUB_URI = 'x-github-client://openRepo/'
 USER_KEY = '/'
 STAR_KEY = '*'
-KEYS = [USER_KEY, STAR_KEY]
+SEARCH_USER_KEY = '@'
+KEYS = [USER_KEY, STAR_KEY, SEARCH_USER_KEY]
 RESULT_LIMIT = 100
 SEARCH_LIMIT = 10
 STAR_GLYPH = ''
 REPO_GLYPH = ''
 FORK_GLYPH = ''
+USER_GLYPH = ''
 
 class GithubQuickLauncher(Flox):
 
-    def init_github(self):
+    def __init__(self):
+        super().__init__()
         self.token = self.settings.get('token', None)
         self.username = self.settings.get('username', None)
         if self.token is not None and self.token != "":
@@ -46,41 +49,58 @@ class GithubQuickLauncher(Flox):
             return []
         return user.get_repos()
 
-    def results(self, query, repos: list, default_glyph: str=REPO_GLYPH, **kwargs):
+    def results(self, query, results: list, default_glyph: str=REPO_GLYPH, **kwargs):
         limit = kwargs.pop('limit', RESULT_LIMIT)
+        dont_filter = kwargs.pop('filter', False)
         self.font_family = "#octicons"
         query = strip_keywords(query, KEYS)
-        for idx, repo in enumerate(repos):
-            glyph = default_glyph
-            if query.lower() in repo.full_name.lower():
-                if repo.fork and default_glyph != STAR_GLYPH:
-                    glyph=FORK_GLYPH
+        for idx, result in enumerate(results):
+            if isinstance(result, (Repository.Repository)):
+                glyph = default_glyph
+                if query.lower() in result.full_name.lower() or dont_filter:
+                    if result.fork and default_glyph != STAR_GLYPH:
+                        glyph=FORK_GLYPH
+                    self.add_item(
+                        title=result.full_name,
+                        subtitle=result.description,
+                        icon=self.icon,
+                        glyph=glyph,
+                        method=self.default_action,
+                        parameters=[result.full_name],
+                        context=[result.full_name]
+                )
+            if isinstance(result, (NamedUser.NamedUser)):
                 self.add_item(
-                    title=repo.full_name,
-                    subtitle=repo.description,
-                    glyph=glyph,
-                    method=self.default_action,
-                    parameters=[repo.full_name],
-                    context=[repo.full_name]
-            )
+                    title=result.login,
+                    subtitle='',
+                    icon=self.icon,
+                    glyph=USER_GLYPH,
+                    method=self.change_query,
+                    parameters=[f'{self.user_keyword} {result.login}{USER_KEY}'],
+                    context=[result.login],
+                    dont_hide=True
+                )
             if idx == limit:
                 break
         return self._results
 
     def query(self, query):
+        self.font_family = "#octicons"
         try:
-            self.init_github()
-            repos = []
-            stars = []
+            results = []
             if self.settings.get('token', None) is not None and query.startswith(STAR_KEY):
-                stars = self.get_user_stars(query)
-                self.results(query, stars, STAR_GLYPH)
+                results = self.get_user_stars(query)
+                self.results(query, results, STAR_GLYPH)
+            elif query.startswith(SEARCH_USER_KEY):
+                if query != SEARCH_USER_KEY:
+                    results = self.gh.search_users(query=query.replace(SEARCH_USER_KEY, ''))
+                self.results(query, results, USER_GLYPH)
             elif not query.startswith(USER_KEY):
-                repos = self.get_user_repos(query)
-                self.results(query, repos)
+                results = self.get_user_repos(query)
+                self.results(query, results, dont_filter=True)
             if len(self._results) == 0 and query != '':
-                repos = self.search_repos(query)
-                self.results(query, repos, limit=SEARCH_LIMIT)
+                results = self.search_repos(query)
+                self.results(query, results, limit=SEARCH_LIMIT, dont_filter=True)
         except RateLimitExceededException:
             self.add_item(
                 title='Github Rate Limit Exceeded',
@@ -118,23 +138,23 @@ class GithubQuickLauncher(Flox):
             )
 
     def context_menu(self, data):
-        self.logger.warning(data)
         if data != {}:
-            repo_fullname = data[0]
+            sub_dir = data[0]
             self.add_item(
                 title='Open in Browser',
-                subtitle=f"Open {repo_fullname} in Browser.",
+                subtitle=f"Open {sub_dir} in Browser.",
                 icon=ICON_BROWSER,
                 method=self.open_in_browser,
-                parameters=[repo_fullname]
+                parameters=[sub_dir]
             )
-            self.add_item(
-                title='Open Desktop Application',
-                subtitle=f"Open {repo_fullname} in Desktop Application.",
-                icon=ICON_OPEN,
-                method=self.open_in_app,
-                parameters=[repo_fullname]
-            )
+            if '/' in sub_dir:
+                self.add_item(
+                    title='Open Desktop Application',
+                    subtitle=f"Open {sub_dir} in Desktop Application.",
+                    icon=ICON_OPEN,
+                    method=self.open_in_app,
+                    parameters=[sub_dir]
+                )
 
     def default_action(self, repo_fullname):
         action = self.settings.get('default_action', 'Open in Browser')
