@@ -12,7 +12,7 @@ GITHUB_URI = 'x-github-client://openRepo/'
 USER_KEY = '/'
 STAR_KEY = '*'
 SEARCH_USER_KEY = '@'
-KEYS = [USER_KEY, STAR_KEY]
+KEYS = [USER_KEY, STAR_KEY, SEARCH_USER_KEY]
 RESULT_LIMIT = 100
 SEARCH_LIMIT = 10
 STAR_GLYPH = ''
@@ -51,13 +51,13 @@ class GithubQuickLauncher(Flox):
 
     def results(self, query, results: list, default_glyph: str=REPO_GLYPH, **kwargs):
         limit = kwargs.pop('limit', RESULT_LIMIT)
+        dont_filter = kwargs.pop('filter', False)
         self.font_family = "#octicons"
         query = strip_keywords(query, KEYS)
-        
         for idx, result in enumerate(results):
             if isinstance(result, (Repository.Repository)):
                 glyph = default_glyph
-                if query.lower() in result.full_name.lower():
+                if query.lower() in result.full_name.lower() or dont_filter:
                     if result.fork and default_glyph != STAR_GLYPH:
                         glyph=FORK_GLYPH
                     self.add_item(
