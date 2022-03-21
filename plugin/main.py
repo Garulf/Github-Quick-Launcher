@@ -14,11 +14,18 @@ STAR_KEY = '*'
 SEARCH_USER_KEY = '@'
 KEYS = [USER_KEY, STAR_KEY, SEARCH_USER_KEY]
 RESULT_LIMIT = 100
+MAX_ISSUES = 200
 SEARCH_LIMIT = 10
 STAR_GLYPH = ''
 REPO_GLYPH = ''
-FORK_GLYPH = ''
+FORK_GLYPH = ''
 USER_GLYPH = ''
+ISSUE_OPEN_GLYPH = ''
+ISSUE_CLOSED_GLYPH = ''
+ISSUE_GLYPHS = {
+    'open': ISSUE_OPEN_GLYPH,
+    'closed': ISSUE_CLOSED_GLYPH
+}
 
 class GithubQuickLauncher(Flox):
 
@@ -26,6 +33,7 @@ class GithubQuickLauncher(Flox):
         super().__init__()
         self.token = self.settings.get('token', None)
         self.username = self.settings.get('username', None)
+        self.font_family = "#octicons"
         if self.token is not None and self.token != "":
             self.gh = Github(self.token)
         else:
@@ -52,7 +60,7 @@ class GithubQuickLauncher(Flox):
     def results(self, query, results: list, default_glyph: str=REPO_GLYPH, **kwargs):
         limit = kwargs.pop('limit', RESULT_LIMIT)
         dont_filter = kwargs.pop('filter', False)
-        self.font_family = "#octicons"
+
         query = strip_keywords(query, KEYS)
         for idx, result in enumerate(results):
             if isinstance(result, (Repository.Repository)):
@@ -160,15 +168,18 @@ class GithubQuickLauncher(Flox):
 
     def get_issues(self, repo):
         repo = self.gh.get_repo(repo)
-        issues = repo.get_issues()
-        for issue in issues:
+        open_issues = repo.get_issues(state='all', sort='updated')
+        for idx, issue in enumerate(open_issues):
             self.add_item(
                 title=f"#{issue.number} - {issue.title}",
-                subtitle=issue.body.replace('\r\n', ' '),
+                subtitle=str(issue.body).replace('\r\n', ' '),
                 icon=self.icon,
-                method=self.open_in_browser,
+                glyph=ISSUE_GLYPHS[issue.state],
+                method=self.browser_open,
                 parameters=[issue.html_url]
             )
+            if idx == MAX_ISSUES:
+                break
         return self._results
 
     def default_action(self, repo_fullname):

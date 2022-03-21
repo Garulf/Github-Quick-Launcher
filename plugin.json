@@ -4,7 +4,7 @@
     "Name": "Github Quick Launcher",
     "Description": "Quickly access your personal repositories and stars.",
     "Author": "Garulf",
-    "Version": "1.4.0",
+    "Version": "1.4.1",
     "Language": "python",
     "Website": "https://github.com/Garulf/github-quick-launcher",
     "IcoPath": "./icon.png",
