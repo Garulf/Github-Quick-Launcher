@@ -14,6 +14,7 @@ STAR_KEY = '*'
 SEARCH_USER_KEY = '@'
 KEYS = [USER_KEY, STAR_KEY, SEARCH_USER_KEY]
 RESULT_LIMIT = 100
+MAX_ISSUES = 200
 SEARCH_LIMIT = 10
 STAR_GLYPH = ''
 REPO_GLYPH = ''
@@ -167,8 +168,8 @@ class GithubQuickLauncher(Flox):
 
     def get_issues(self, repo):
         repo = self.gh.get_repo(repo)
-        issues = repo.get_issues()
-        for issue in issues:
+        open_issues = repo.get_issues(state='all', sort='updated')
+        for idx, issue in enumerate(open_issues):
             self.add_item(
                 title=f"#{issue.number} - {issue.title}",
                 subtitle=issue.body.replace('\r\n', ' '),
@@ -176,6 +177,8 @@ class GithubQuickLauncher(Flox):
                 method=self.open_in_browser,
                 parameters=[issue.html_url]
             )
+            if idx == MAX_ISSUES:
+                break
         return self._results
 
     def default_action(self, repo_fullname):
