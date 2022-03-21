@@ -172,7 +172,7 @@ class GithubQuickLauncher(Flox):
         for idx, issue in enumerate(open_issues):
             self.add_item(
                 title=f"#{issue.number} - {issue.title}",
-                subtitle=issue.body.replace('\r\n', ' '),
+                subtitle=str(issue.body).replace('\r\n', ' '),
                 icon=self.icon,
                 method=self.open_in_browser,
                 parameters=[issue.html_url]
