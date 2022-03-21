@@ -175,6 +175,7 @@ class GithubQuickLauncher(Flox):
                 subtitle=str(issue.body).replace('\r\n', ' '),
                 icon=self.icon,
                 method=self.open_in_browser,
+                glyph=ISSUE_GLYPHS[issue.state],
                 parameters=[issue.html_url]
             )
             if idx == MAX_ISSUES:
