@@ -1,3 +1,3 @@
-flox-lib==0.10.0
+flox-lib==0.11.1
 pygithub==1.55
 requests==2.25.1
