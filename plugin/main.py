@@ -151,10 +151,25 @@ class GithubQuickLauncher(Flox):
                 self.add_item(
                     title='Open Desktop Application',
                     subtitle=f"Open {sub_dir} in Desktop Application.",
-                    icon=ICON_OPEN,
+                    icon=ICON_BROWSER,
                     method=self.open_in_app,
                     parameters=[sub_dir]
                 )
+                self._results = utils.cache(sub_dir, 120)(self.get_issues)(sub_dir)
+                return self._results
+
+    def get_issues(self, repo):
+        repo = self.gh.get_repo(repo)
+        issues = repo.get_issues()
+        for issue in issues:
+            self.add_item(
+                title=f"#{issue.number} - {issue.title}",
+                subtitle=issue.body.replace('\r\n', ' '),
+                icon=self.icon,
+                method=self.open_in_browser,
+                parameters=[issue.html_url]
+            )
+        return self._results
 
     def default_action(self, repo_fullname):
         action = self.settings.get('default_action', 'Open in Browser')
