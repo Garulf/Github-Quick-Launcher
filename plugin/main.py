@@ -17,8 +17,14 @@ RESULT_LIMIT = 100
 SEARCH_LIMIT = 10
 STAR_GLYPH = ''
 REPO_GLYPH = ''
-FORK_GLYPH = ''
+FORK_GLYPH = ''
 USER_GLYPH = ''
+ISSUE_OPEN_GLYPH = ''
+ISSUE_CLOSED_GLYPH = ''
+ISSUE_GLYPHS = {
+    'open': ISSUE_OPEN_GLYPH,
+    'closed': ISSUE_CLOSED_GLYPH
+}
 
 class GithubQuickLauncher(Flox):
 
@@ -26,6 +32,7 @@ class GithubQuickLauncher(Flox):
         super().__init__()
         self.token = self.settings.get('token', None)
         self.username = self.settings.get('username', None)
+        self.font_family = "#octicons"
         if self.token is not None and self.token != "":
             self.gh = Github(self.token)
         else:
@@ -52,7 +59,7 @@ class GithubQuickLauncher(Flox):
     def results(self, query, results: list, default_glyph: str=REPO_GLYPH, **kwargs):
         limit = kwargs.pop('limit', RESULT_LIMIT)
         dont_filter = kwargs.pop('filter', False)
-        self.font_family = "#octicons"
+
         query = strip_keywords(query, KEYS)
         for idx, result in enumerate(results):
             if isinstance(result, (Repository.Repository)):
