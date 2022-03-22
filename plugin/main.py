@@ -186,7 +186,7 @@ class GithubQuickLauncher(Flox):
                 icon = ISSUE_ICONS[issue.state]
             self.add_item(
                 title=f"#{issue.number} - {issue.title}",
-                subtitle=str(issue.body).replace('\r\n', ' '),
+                subtitle=str(issue.body).replace('\r\n', ' ').replace('\n', ' ').replace('\r', ' '),
                 icon=icon,
                 method=self.browser_open,
                 parameters=[issue.html_url]
