@@ -20,6 +20,20 @@ STAR_GLYPH = ''
 REPO_GLYPH = ''
 FORK_GLYPH = ''
 USER_GLYPH = ''
+
+ICON_DIR = Path(__file__).parent.parent.joinpath('icons')
+STAR_ICON = ICON_DIR.joinpath('star-fill.png')
+PR_OPEN_ICON = ICON_DIR.joinpath('git-pull-request.png')
+PR_MERGED_ICON = ICON_DIR.joinpath('git-merge.png')
+PR_ICONS = {
+    'open': PR_OPEN_ICON,
+    'closed': PR_MERGED_ICON
+}
+ISSUE_OPEN_ICON = ICON_DIR.joinpath('issue-opened.png')
+ISSUE_CLOSED_ICON = ICON_DIR.joinpath('issue-closed.png')
+ISSUE_ICONS = {
+    'open': ISSUE_OPEN_ICON,
+    'closed': ISSUE_CLOSED_ICON
 }
 
 class GithubQuickLauncher(Flox):
