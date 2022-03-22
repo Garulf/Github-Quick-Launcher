@@ -35,6 +35,7 @@ ISSUE_ICONS = {
     'open': ISSUE_OPEN_ICON,
     'closed': ISSUE_CLOSED_ICON
 }
+PULL_SUB_DIR = '/pull/'
 
 class GithubQuickLauncher(Flox):
 
@@ -179,11 +180,14 @@ class GithubQuickLauncher(Flox):
         repo = self.gh.get_repo(repo)
         open_issues = repo.get_issues(state='all', sort='updated')
         for idx, issue in enumerate(open_issues):
+            if PULL_SUB_DIR in issue.html_url:
+                icon = PR_ICONS[issue.state]
+            else:
+                icon = ISSUE_ICONS[issue.state]
             self.add_item(
                 title=f"#{issue.number} - {issue.title}",
                 subtitle=str(issue.body).replace('\r\n', ' '),
-                icon=self.icon,
-                glyph=ISSUE_GLYPHS[issue.state],
+                icon=icon,
                 method=self.browser_open,
                 parameters=[issue.html_url]
             )
