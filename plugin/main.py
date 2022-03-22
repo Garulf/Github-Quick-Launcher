@@ -20,11 +20,6 @@ STAR_GLYPH = ''
 REPO_GLYPH = ''
 FORK_GLYPH = ''
 USER_GLYPH = ''
-ISSUE_OPEN_GLYPH = ''
-ISSUE_CLOSED_GLYPH = ''
-ISSUE_GLYPHS = {
-    'open': ISSUE_OPEN_GLYPH,
-    'closed': ISSUE_CLOSED_GLYPH
 }
 
 class GithubQuickLauncher(Flox):
