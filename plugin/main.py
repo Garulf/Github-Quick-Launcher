@@ -14,18 +14,28 @@ STAR_KEY = '*'
 SEARCH_USER_KEY = '@'
 KEYS = [USER_KEY, STAR_KEY, SEARCH_USER_KEY]
 RESULT_LIMIT = 100
-MAX_ISSUES = 200
+MAX_ISSUES = 50
 SEARCH_LIMIT = 10
 STAR_GLYPH = ''
 REPO_GLYPH = ''
 FORK_GLYPH = ''
 USER_GLYPH = ''
-ISSUE_OPEN_GLYPH = ''
-ISSUE_CLOSED_GLYPH = ''
-ISSUE_GLYPHS = {
-    'open': ISSUE_OPEN_GLYPH,
-    'closed': ISSUE_CLOSED_GLYPH
+
+ICON_DIR = Path(__file__).parent.parent.joinpath('icons')
+STAR_ICON = ICON_DIR.joinpath('star-fill.png')
+PR_OPEN_ICON = ICON_DIR.joinpath('git-pull-request.png')
+PR_MERGED_ICON = ICON_DIR.joinpath('git-merge.png')
+PR_ICONS = {
+    'open': PR_OPEN_ICON,
+    'closed': PR_MERGED_ICON
 }
+ISSUE_OPEN_ICON = ICON_DIR.joinpath('issue-opened.png')
+ISSUE_CLOSED_ICON = ICON_DIR.joinpath('issue-closed.png')
+ISSUE_ICONS = {
+    'open': ISSUE_OPEN_ICON,
+    'closed': ISSUE_CLOSED_ICON
+}
+PULL_SUB_DIR = '/pull/'
 
 class GithubQuickLauncher(Flox):
 
@@ -170,11 +180,14 @@ class GithubQuickLauncher(Flox):
         repo = self.gh.get_repo(repo)
         open_issues = repo.get_issues(state='all', sort='updated')
         for idx, issue in enumerate(open_issues):
+            if PULL_SUB_DIR in issue.html_url:
+                icon = PR_ICONS[issue.state]
+            else:
+                icon = ISSUE_ICONS[issue.state]
             self.add_item(
                 title=f"#{issue.number} - {issue.title}",
-                subtitle=str(issue.body).replace('\r\n', ' '),
-                icon=self.icon,
-                glyph=ISSUE_GLYPHS[issue.state],
+                subtitle=str(issue.body).replace('\r\n', ' ').replace('\n', ' ').replace('\r', ' '),
+                icon=icon,
                 method=self.browser_open,
                 parameters=[issue.html_url]
             )
