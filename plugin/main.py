@@ -6,6 +6,7 @@ from utils import strip_keywords
 
 from github import Github, NamedUser, Repository
 from github.GithubException import RateLimitExceededException, BadCredentialsException, UnknownObjectException, GithubException
+import keyring
 
 GITHUB_BASE_URL = "https://github.com/"
 GITHUB_URI = 'x-github-client://openRepo/'
@@ -41,8 +42,11 @@ class GithubQuickLauncher(Flox):
 
     def __init__(self):
         super().__init__()
-        self.token = self.settings.get('token', None)
         self.username = self.settings.get('username', None)
+        self.token = self.settings.get('token') or keyring.get_password(self.manifest['Name'], self.username)
+        if self.settings.get('token', None):
+            self.settings['token'] = ''
+            keyring.set_password(self.manifest['Name'], self.username, self.token)
         self.font_family = "#octicons"
         if self.token is not None and self.token != "":
             self.gh = Github(self.token)
