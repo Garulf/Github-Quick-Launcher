@@ -1,3 +1,2 @@
 pyflowlauncher==0.6.0.dev0
-pygithub==1.55
-keyring==23.13.1
+pygithub==1.54
