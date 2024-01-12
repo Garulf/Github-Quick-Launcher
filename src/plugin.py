@@ -1,7 +1,7 @@
 from typing import Optional
 
 from pyflowlauncher import Plugin
-from .query import query
+from query import query
 
 
 def main(plugin: Optional[Plugin] = None):

@@ -1,7 +1,7 @@
 from github import Github
 from pyflowlauncher.result import ResultResponse, send_results
 
-from . import results
+import results
 
 STARS_PREFIX = "*"
 SEPERATOR = "/"
