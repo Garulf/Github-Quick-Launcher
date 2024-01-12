@@ -8,5 +8,5 @@
   "Language": "python",
   "Website": "https://github.com/Garulf/github-quick-launcher",
   "IcoPath": "./icon.png",
-  "ExecuteFileName": "__main__.py"
+  "ExecuteFileName": "Github-Quick-Launcher.pyz"
 }
