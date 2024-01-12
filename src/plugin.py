@@ -1,9 +1,11 @@
+from typing import Optional
+
 from pyflowlauncher import Plugin
+from .query import query
 
 
-def main(plugin: Plugin) -> Plugin:
-    @plugin.on_method
-    def query(query: str):
-        pass
+def main(plugin: Optional[Plugin] = None):
+    plugin = plugin or Plugin()
 
-    return plugin
+    plugin.add_method(query)
+    plugin.run()
