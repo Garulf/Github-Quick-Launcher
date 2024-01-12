@@ -8,6 +8,9 @@ SEPERATOR = "/"
 
 
 def query(query: str) -> ResultResponse:
+    if not query:
+        return send_results([])
+
     gh = Github(per_page=15)
 
     if query.endswith(SEPERATOR):
