@@ -121,3 +121,5 @@ flox
 .vscode/
 bin/
 .history/
+
+*.zip
