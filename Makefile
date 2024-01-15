@@ -1,8 +1,8 @@
 VENV = venv
 PYTHON = $(VENV)/bin/python3
 PIP = $(VENV)/bin/pip
-PLUGIN_NAME = $(shell jq -r '.Name' ./resources/plugin.json | tr " " "-")
-PLUGIN_VERSION = $(shell jq -r '.Version' ./resources/plugin.json)
+PLUGIN_NAME = $(shell jq -r '.Name' ./src/plugin.json | tr " " "-")
+PLUGIN_VERSION = $(shell jq -r '.Version' ./src/plugin.json)
 PLUGIN_DIR = $(PLUGIN_NAME)-$(PLUGIN_VERSION)
 ZIP_FILE = $(PLUGIN_DIR).zip
 
@@ -38,18 +38,19 @@ cleanbuild:
 cleandist:
 	rm -rf dist
 
-build: cleanbuild
+build:
 	mkdir -p build
-	cp -R src/. build/
+	find ./src -name '*.py' -exec cp {} ./build \;
 	python3 -m pip install -r requirements.txt -t ./build
 
 ./dist/*.pyz: build dist
-	python3 -m zipapp --output="./dist/$(shell jq '.Name' ./resources/plugin.json | tr " " "-" | tr -d '"').pyz" ./build
+	python3 -m zipapp --output="./dist/$(PLUGIN_NAME)" ./build
 
 zipapp: ./dist/*.pyz
 
 dist: build
-	cp -R resources/. dist/
+	mkdir -p dist
+	find ./src -not -name '*.py*' -not -name 'src' -not -name '__pycache__' -exec cp -r {} ./dist \;
 
 package: ./dist/*.pyz
 	cd ./dist && zip -r ../$(ZIP_FILE) *
