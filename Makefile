@@ -6,21 +6,18 @@ PLUGIN_VERSION = $(shell jq -r '.Version' ./src/plugin.json)
 PLUGIN_DIR = $(PLUGIN_NAME)-$(PLUGIN_VERSION)
 ZIP_FILE = $(PLUGIN_DIR).zip
 
-$(VENV)/bin/activate:
+
+venv:
 	python3 -m venv $(VENV)
-
-venv: $(VENV)/bin/activate
-
-install: $(VENV)/bin/activate requirements.txt
 	$(PIP) install -r requirements.txt
-
-installdev: $(VENV)/bin/activate requirements-dev.txt
 	$(PIP) install -r requirements-dev.txt
 
-test: install installdev
+init: venv
+
+test: venv
 	$(PYTHON) -m pytest
 
-tox:
+tox: venv
 	$(PYTHON) -m tox
 
 cleanvenv:
@@ -30,7 +27,7 @@ cleanvenv:
 cleantox:
 	rm -rf .tox
 
-clean: cleanvenv cleantox cleanbuild cleandist
+cleanall: cleanvenv cleantox cleanbuild cleandist
 
 cleanbuild:
 	rm -rf build
