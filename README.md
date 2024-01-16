@@ -34,7 +34,8 @@ Simply type a valid username and a `/` at the end.
 <details>
 <summary>Show screenshot</summary>
 
-![image](https://user-images.githubusercontent.com/535299/149842782-6339fcd5-e8d6-404b-bb7d-9234a1f6361b.png)
+![image](https://github.com/Garulf/Github-Quick-Launcher/assets/535299/2a92a6d7-364e-4c55-b8ac-c81da9eb52d2)
+
 
 </details>
 
@@ -43,8 +44,10 @@ Simply type a valid username and a `/` at the end.
 <details>
 <summary>Show screenshot</summary>
 
-![image](https://user-images.githubusercontent.com/535299/149843104-7582f94b-5a39-47fa-a62b-e95279b24d58.png)
+![image](https://github.com/Garulf/Github-Quick-Launcher/assets/535299/51d56c53-9eac-4c18-b724-333fe88fc31f)
+
 
 </details>
+
 
 <a href="https://www.buymeacoffee.com/garulf" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
