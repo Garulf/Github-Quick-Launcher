@@ -11,8 +11,8 @@ SEPERATOR = "/"
 def query(query: str) -> ResultResponse:
     if not query:
         return send_results([])
-    settings = JsonRPCClient().recieve().get("settings", {})
 
+    settings = JsonRPCClient().recieve().get("settings", {})
     token = settings.get("token", None) or None
     gh = Github(login_or_token=token, per_page=15)
 
