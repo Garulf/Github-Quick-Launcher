@@ -41,7 +41,7 @@ build:
 	python3 -m pip install -r requirements.txt -t ./build
 
 ./dist/*.pyz: build dist
-	python3 -m zipapp --output="./dist/$(PLUGIN_NAME)" ./build
+	python3 -m zipapp --output="./dist/$(PLUGIN_NAME).pyz" ./build
 
 zipapp: ./dist/*.pyz
 
