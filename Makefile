@@ -35,10 +35,14 @@ cleanbuild:
 cleandist:
 	rm -rf dist
 
-build:
+lib:
+	mkdir -p lib
+	python3 -m pip install -r requirements.txt -t ./lib
+
+build: lib
 	mkdir -p build
 	find ./src -name '*.py' -exec cp {} ./build \;
-	python3 -m pip install -r requirements.txt -t ./build
+	cp -R ./lib/. ./build
 
 ./dist/*.pyz: build dist
 	python3 -m zipapp --output="./dist/$(PLUGIN_NAME).pyz" ./build
