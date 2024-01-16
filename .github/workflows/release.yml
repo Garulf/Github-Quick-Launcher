@@ -37,7 +37,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           draft: false
-          files: "./${{steps.zipname.outputs.zipname}}.zip"
+          files: "./${{steps.zipname.outputs.zipname}}"
           tag_name: "v${{steps.version.outputs.version}}"
           generate_release_notes: true
         env:
