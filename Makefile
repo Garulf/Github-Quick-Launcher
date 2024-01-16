@@ -56,5 +56,6 @@ installplugin: dist
 	mkdir -p $(INSTALL_DIR)/$(PLUGIN_DIR)
 	cp -R ./dist/. $(INSTALL_DIR)/$(PLUGIN_DIR)/
 
-
+zipname:
+	@echo $(PLUGIN_DIR).zip
 	
