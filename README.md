@@ -1,3 +1,5 @@
+[![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/garulf/github-quick-launcher/test-plugin.yml?style=flat-square&label=tests)](https://github.com/Garulf/pyFlowLauncher/actions/workflows/tests.yaml) [![buymeacoffee](https://img.shields.io/badge/buy%20me%20a%20coffee-yellow.svg?style=flat-square&logo=buymeacoffee&logoColor=000)](https://www.buymeacoffee.com/garulf)
+
 # Github-Quick-Launcher
 
 Quickly access your personal repositories and stars.
