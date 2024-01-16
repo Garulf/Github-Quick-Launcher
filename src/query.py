@@ -1,5 +1,6 @@
 from github import Github
 from pyflowlauncher.result import ResultResponse, send_results
+from pyflowlauncher.jsonrpc import JsonRPCClient
 
 import results
 
@@ -10,12 +11,12 @@ SEPERATOR = "/"
 def query(query: str) -> ResultResponse:
     if not query:
         return send_results([])
+    settings = JsonRPCClient().recieve().get("settings", {})
 
-    gh = Github(per_page=15)
+    token = settings.get("token", None) or None
+    gh = Github(login_or_token=token, per_page=15)
 
-    if query.endswith(SEPERATOR):
-        repos = gh.get_user(query[:-1]).get_repos()
-    elif SEPERATOR in query:
+    if SEPERATOR in query:
         user, query = query.split(SEPERATOR)
         repos = gh.search_repositories(f"user:{user} {query}")
     else:
