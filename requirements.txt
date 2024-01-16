@@ -1,2 +1,2 @@
-pyflowlauncher==0.6.0.dev0
+pyflowlauncher==0.6.1.dev0
 pygithub==1.54
