@@ -12,6 +12,7 @@ def repo_result(repo: Repository) -> Result:
         SubTitle=repo.description,
         IcoPath=repo.owner.avatar_url,
         JsonRPCAction=open_url(repo.html_url),
+        CopyText=repo.full_name
     )
 
 
