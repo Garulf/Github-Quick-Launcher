@@ -1,3 +1,2 @@
-pyflowlauncher==0.6.1.dev0
+pyflowlauncher[all]==0.7.0.dev0
 pygithub==1.54
-typing-extensions==4.9.0
