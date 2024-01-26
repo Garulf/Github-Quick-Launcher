@@ -123,3 +123,4 @@ bin/
 .history/
 
 *.zip
+*.sqlite
