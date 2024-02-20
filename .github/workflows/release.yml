@@ -10,10 +10,13 @@ on:
 env:
   PYTHON_VER: 3.11
 jobs:
+  test:
+    uses: ./.github/workflows/test-plugin.yml
   deps:
     if: ${{ github.ref == 'refs/heads/main' }}
     name: "Build"
     runs-on: ubuntu-latest
+    needs: test
     steps:
       - uses: actions/checkout@v3
       - name: Set up Python ${{ env.PYTHON_VER }}
