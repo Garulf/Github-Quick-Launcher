@@ -1,4 +1,4 @@
-VENV = venv
+VENV = .venv
 PYTHON = $(VENV)/bin/python3
 PIP = $(VENV)/bin/pip
 PLUGIN_NAME = $(shell jq -r '.Name' ./src/plugin.json | tr " " "-")
