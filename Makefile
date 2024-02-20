@@ -1,4 +1,4 @@
-VENV = venv
+VENV = .venv
 PYTHON = $(VENV)/bin/python3
 PIP = $(VENV)/bin/pip
 PLUGIN_NAME = $(shell jq -r '.Name' ./src/plugin.json | tr " " "-")
@@ -7,17 +7,17 @@ PLUGIN_DIR = $(PLUGIN_NAME)-$(PLUGIN_VERSION)
 ZIP_FILE = $(PLUGIN_DIR).zip
 
 
-venv:
+.venv:
 	python3 -m venv $(VENV)
 	$(PIP) install -r requirements.txt
 	$(PIP) install -r requirements-dev.txt
 
-init: venv
+init: .venv
 
-test: venv
+test: .venv
 	$(PYTHON) -m pytest
 
-tox: venv
+tox: .venv
 	$(PYTHON) -m tox
 
 cleanvenv:
