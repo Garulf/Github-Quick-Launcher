@@ -32,27 +32,17 @@ No special access should be required, but if you allow `read:org` the plugin wil
 
 ## Usage
 
+### Search Github
+
+![output](https://github.com/Garulf/Github-Quick-Launcher/assets/535299/ac359f81-1efa-472b-a79f-ef0354ed49c9)
+
 ### Search user's repositories:
 
 Simply type a valid username and a `/` at the end.
 
-<details>
-<summary>Show screenshot</summary>
-
-![image](https://github.com/Garulf/Github-Quick-Launcher/assets/535299/2a92a6d7-364e-4c55-b8ac-c81da9eb52d2)
+![example1](https://github.com/Garulf/Github-Quick-Launcher/assets/535299/50b20c9b-1784-4427-852f-01a3f4f6a4e9)
 
 
-</details>
-
-### Search Github
-
-<details>
-<summary>Show screenshot</summary>
-
-![image](https://github.com/Garulf/Github-Quick-Launcher/assets/535299/51d56c53-9eac-4c18-b724-333fe88fc31f)
-
-
-</details>
 
 
 <a href="https://www.buymeacoffee.com/garulf" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
