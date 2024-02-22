@@ -4,6 +4,9 @@
 
 Quickly access your personal repositories and stars.
 
+![screenshot](https://github.com/Garulf/Github-Quick-Launcher/assets/535299/2cbe2e2d-bdb6-4dcc-a6ca-ca77424544e6)
+
+
 ## Installation:
 
 ```
