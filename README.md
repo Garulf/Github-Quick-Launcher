@@ -9,9 +9,8 @@ Quickly access your personal repositories and stars.
 
 ## Installation:
 
-```
-pm install github quick launcher
-```
+![pm install github quick launcher](https://github.com/Garulf/Github-Quick-Launcher/assets/535299/13521400-a434-4923-9942-e08f9008e02b)
+
 
 ## Settings:
 
