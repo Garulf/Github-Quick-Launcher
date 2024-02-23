@@ -16,9 +16,19 @@ def query(query: str) -> ResultResponse:
     token = settings.get("token", None) or None
     gh = Github(login_or_token=token, per_page=15)
 
-    if SEPERATOR in query:
-        user, query = query.split(SEPERATOR)
-        repos = gh.search_repositories(f"user:{user} {query}")
+    repo_query = query
+    parsed_query = query.split(SEPERATOR)
+
+    if query.startswith(STARS_PREFIX) and token:
+        stars = query[1:]
+        repos = gh.get_user().get_starred()
+        return send_results(results.starred_repo_results(stars, repos))
     else:
-        repos = gh.search_repositories(query)
+        if len(parsed_query) > 1:
+            user, search = parsed_query
+            if not user and token is not None:
+                user = gh.get_user().login
+            if user:
+                repo_query = f"user:{user} {search}"
+        repos = gh.search_repositories(repo_query)
     return send_results(results.repo_results(repos))

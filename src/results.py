@@ -6,6 +6,7 @@ from pyflowlauncher.api import open_url, copy_to_clipboard
 from pyflowlauncher.icons import BROWSER, OPEN, COPY
 from github.Repository import Repository
 from github.PaginatedList import PaginatedList
+from pyflowlauncher.utils import score_results
 
 
 def repo_result(repo: Repository) -> Result:
@@ -22,6 +23,10 @@ def repo_result(repo: Repository) -> Result:
 def repo_results(repos: PaginatedList) -> Generator[Result, None, None]:
     for repo in repos.get_page(0):
         yield repo_result(repo)
+
+
+def starred_repo_results(query: str, repos: PaginatedList) -> Generator[Result, None, None]:
+    yield from score_results(query, repo_results(repos), match_on_empty_query=True)
 
 
 def context_menu_results(full_name: str, html_url: str):
