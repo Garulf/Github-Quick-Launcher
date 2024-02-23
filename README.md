@@ -43,6 +43,19 @@ Simply type a valid username and a `/` at the end.
 
 ![example1](https://github.com/Garulf/Github-Quick-Launcher/assets/535299/50b20c9b-1784-4427-852f-01a3f4f6a4e9)
 
+### Search owned repos
+
+*new* If you provided a github API token you can type `/` to show all repos owned by your token.
+
+![example3](https://github.com/Garulf/Github-Quick-Launcher/assets/535299/f141d384-ab34-434d-ab19-fbfaa6c7a763)
+
+### Search starred repos
+
+*new* If github API token is provided type `*` to search starred repos
+
+![example4](https://github.com/Garulf/Github-Quick-Launcher/assets/535299/edfff931-a5c6-4907-823e-fb668c902399)
+
+
 
 
 
