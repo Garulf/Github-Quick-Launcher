@@ -21,7 +21,7 @@ def query(query: str) -> ResultResponse:
 
     if token:
         if query.startswith("/") or query == "":
-            repos = gh.get_user().get_repos()
+            repos = gh.get_user().get_repos(sort="updated")
             return send_results(scored_repo_results(query, repos))
         elif query.startswith(STARS_PREFIX):
             query = query[1:]
