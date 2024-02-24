@@ -2,33 +2,32 @@ from github import Github
 from pyflowlauncher.result import ResultResponse, send_results
 from pyflowlauncher.jsonrpc import JsonRPCClient
 
-import results
+from results import repo_results, scored_repo_results
 
 STARS_PREFIX = "*"
 SEPERATOR = "/"
 
+PER_PAGE = 50
 
 def query(query: str) -> ResultResponse:
-    if not query:
-        return send_results([])
-
     settings = JsonRPCClient().recieve().get("settings", {})
     token = settings.get("token", None) or None
-    gh = Github(login_or_token=token, per_page=15)
+    gh = Github(login_or_token=token, per_page=PER_PAGE)
 
     repo_query = query
     parsed_query = query.split(SEPERATOR)
 
-    if query.startswith(STARS_PREFIX) and token:
-        stars = query[1:]
-        repos = gh.get_user().get_starred()
-        return send_results(results.starred_repo_results(stars, repos))
+    if token:
+        if query.startswith("/") or query == "":
+            repos = gh.get_user().get_repos()
+            return send_results(scored_repo_results(query, repos))
+        elif query.startswith(STARS_PREFIX):
+            query = query[1:]
+            repos = gh.get_user().get_starred()
+            return send_results(scored_repo_results(query, repos))
+    if len(parsed_query) == 2:
+        user, repo_query = parsed_query
+        results = repo_results(gh.search_repositories(f"user:{user} {repo_query}")[:PER_PAGE])
     else:
-        if len(parsed_query) > 1:
-            user, search = parsed_query
-            if not user and token is not None:
-                user = gh.get_user().login
-            if user:
-                repo_query = f"user:{user} {search}"
-        repos = gh.search_repositories(repo_query)
-    return send_results(results.repo_results(repos))
+        results = repo_results(gh.search_repositories(repo_query)[:PER_PAGE])
+    return send_results(results)
