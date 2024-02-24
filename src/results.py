@@ -21,11 +21,11 @@ def repo_result(repo: Repository) -> Result:
 
 
 def repo_results(repos: PaginatedList) -> Generator[Result, None, None]:
-    for repo in repos.get_page(0):
+    for repo in repos:
         yield repo_result(repo)
 
 
-def starred_repo_results(query: str, repos: PaginatedList) -> Generator[Result, None, None]:
+def scored_repo_results(query: str, repos: PaginatedList) -> Generator[Result, None, None]:
     yield from score_results(query, repo_results(repos), match_on_empty_query=True)
 
 

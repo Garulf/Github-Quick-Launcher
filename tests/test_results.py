@@ -9,9 +9,8 @@ HTML_URL = "https://github.com/garulf/pyflowlauncher"
 
 class MockPaginatedResult:
 
-    @property
-    def get_page(self):
-        return lambda _: [MockRepository()]
+    def __iter__(self):
+        return iter([MockRepository()])
 
 
 class MockOwner:
