@@ -9,6 +9,7 @@ SEPERATOR = "/"
 
 PER_PAGE = 50
 
+
 def query(query: str) -> ResultResponse:
     settings = JsonRPCClient().recieve().get("settings", {})
     token = settings.get("token", None) or None
