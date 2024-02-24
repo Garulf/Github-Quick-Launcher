@@ -21,7 +21,7 @@ def repo_result(repo: Repository) -> Result:
 
 
 def repo_results(repos: PaginatedList) -> Generator[Result, None, None]:
-    for repo in repos.get_page(0):
+    for repo in repos:
         yield repo_result(repo)
 
 
