@@ -7,7 +7,7 @@ from results import repo_results, scored_repo_results
 STARS_PREFIX = "*"
 SEPERATOR = "/"
 
-PER_PAGE = 50
+PER_PAGE = 100
 
 
 def query(query: str) -> ResultResponse:
