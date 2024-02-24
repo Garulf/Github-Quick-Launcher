@@ -8,6 +8,7 @@ STARS_PREFIX = "*"
 SEPERATOR = "/"
 
 PER_PAGE = 100
+SEARCH_LIMIT = 15
 
 
 def query(query: str) -> ResultResponse:
@@ -28,7 +29,7 @@ def query(query: str) -> ResultResponse:
             return send_results(scored_repo_results(query, repos))
     if len(parsed_query) == 2:
         user, repo_query = parsed_query
-        results = repo_results(gh.search_repositories(f"user:{user} {repo_query}")[:PER_PAGE])
+        results = repo_results(gh.search_repositories(f"user:{user} {repo_query}")[:SEARCH_LIMIT])
     else:
-        results = repo_results(gh.search_repositories(repo_query)[:PER_PAGE])
+        results = repo_results(gh.search_repositories(repo_query)[:SEARCH_LIMIT])
     return send_results(results)
