@@ -30,10 +30,14 @@ async def repo_results(repos: AsyncGenerator[Repo, None], limit: Optional[int] =
 
 async def scored_repo_results(query: str, repos: AsyncGenerator[Repo, None]) -> AsyncGenerator[Result, None]:
     async for result in repo_results(repos):
-        match = string_matcher(query, result.Title)
-        if match:
-            result.Score = match.score
+        if query == "":
             yield result
+        else:
+            user, repo = result.Title.split("/")
+            match_user, match_repo = string_matcher(query, user), string_matcher(query, repo)
+            if match_user.matched or match_repo.matched:
+                result.Score = max(match_user.score, match_repo.score)
+                yield result
 
 
 def context_menu_results(full_name: str, html_url: str):
