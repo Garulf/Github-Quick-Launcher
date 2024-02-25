@@ -1,32 +1,39 @@
-from typing import Generator
+from typing import AsyncGenerator, Optional
 from urllib.parse import quote_plus
 
 from pyflowlauncher.result import Result
 from pyflowlauncher.api import open_url, copy_to_clipboard
 from pyflowlauncher.icons import BROWSER, OPEN, COPY
-from github.Repository import Repository
-from github.PaginatedList import PaginatedList
-from pyflowlauncher.utils import score_results
+from repo import Repo
+from pyflowlauncher.string_matcher import string_matcher
 
 
-def repo_result(repo: Repository) -> Result:
+def repo_result(repo: Repo) -> Result:
     return Result(
-        Title=repo.full_name,
-        SubTitle=repo.description,
-        IcoPath=repo.owner.avatar_url,
-        JsonRPCAction=open_url(repo.html_url),
-        CopyText=repo.full_name,
-        ContextData=[repo.full_name, repo.html_url],
+        Title=repo["full_name"],
+        SubTitle=repo["description"] or "No description",
+        IcoPath=repo["owner"]["avatar_url"],
+        JsonRPCAction=open_url(repo["html_url"]),
+        CopyText=repo["full_name"],
+        ContextData=[repo["full_name"], repo["html_url"]],
     )
 
 
-def repo_results(repos: PaginatedList) -> Generator[Result, None, None]:
-    for repo in repos:
+async def repo_results(repos: AsyncGenerator[Repo, None], limit: Optional[int] = None) -> AsyncGenerator[Result, None]:
+    i = 0
+    async for repo in repos:
+        if limit and i >= limit:
+            break
         yield repo_result(repo)
+        i += 1
 
 
-def scored_repo_results(query: str, repos: PaginatedList) -> Generator[Result, None, None]:
-    yield from score_results(query, repo_results(repos), match_on_empty_query=True)
+async def scored_repo_results(query: str, repos: AsyncGenerator[Repo, None]) -> AsyncGenerator[Result, None]:
+    async for result in repo_results(repos):
+        match = string_matcher(query, result.Title)
+        if match:
+            result.Score = match.score
+            yield result
 
 
 def context_menu_results(full_name: str, html_url: str):
