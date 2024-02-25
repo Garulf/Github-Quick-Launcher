@@ -22,11 +22,10 @@ async def query(query: str) -> ResultResponse:
     if token:
         if query.startswith("/") or query == "":
             repos = gh.user_repos(sort="updated", per_page=PER_PAGE)
-            return send_results([result async for result in scored_repo_results(query, repos)])
+            return send_results([result async for result in scored_repo_results(query[1:], repos)])
         elif query.startswith(STARS_PREFIX):
-            query = query[1:]
             repos = gh.get_starred(per_page=PER_PAGE)
-            return send_results([result async for result in scored_repo_results(query, repos)])
+            return send_results([result async for result in scored_repo_results(query[1:], repos)])
     if len(parsed_query) == 2:
         user, repo_query = parsed_query
         results = repo_results(gh.search_repos(f"user:{user} {repo_query}", per_page=PER_PAGE), limit=SEARCH_LIMIT)
