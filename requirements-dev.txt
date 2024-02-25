@@ -1,3 +1,4 @@
 pytest
 pytest-recording
 tox
+pytest-asyncio
