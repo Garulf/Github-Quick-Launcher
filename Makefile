@@ -63,3 +63,6 @@ installplugin: dist
 zipname:
 	@echo $(PLUGIN_DIR).zip
 	
+tag:
+	git tag -a v$(PLUGIN_VERSION) -m "Bump from $(PLUGIN_VERSION) to $(PLUGIN_VERSION)"
+	git push origin --tags $(PLUGIN_VERSION)
