@@ -26,9 +26,6 @@ jobs:
         run: make dist
       - name: Package
         run: make package
-      - name: Get version
-        id: version
-        run: echo ::set-output name=version::$(jq -r .Version ./src/plugin.json)
       - name: Get zip name
         id: zipname
         run: echo ::set-output name=zipname::$(make zipname)
@@ -36,9 +33,8 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           draft: false
-          prerelease: ${{ contains(steps.version.outputs.version, '-')}}
+          prerelease: ${{ contains(github.ref_name, '-')}}
           files: "./${{steps.zipname.outputs.zipname}}"
-          tag_name: "v${{steps.version.outputs.version}}"
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
