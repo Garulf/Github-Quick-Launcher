@@ -20,17 +20,15 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VER }}
-      - name: Bump manifest version from tag
-        run: |
-          tag="$GITHUB_REF_NAME"
-          content=$(jq --arg tag $tag '.Version = $tag' ./src/plugin.json)
-          echo $content > ./src/plugin.json
       - name: Build
         run: make build
       - name: Dist
         run: make dist
       - name: Package
         run: make package
+      - name: Get version
+        id: version
+        run: echo ::set-output name=version::$(jq -r .Version ./src/plugin.json)
       - name: Get zip name
         id: zipname
         run: echo ::set-output name=zipname::$(make zipname)
@@ -38,8 +36,9 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           draft: false
-          prerelease: ${{ contains(github.ref_name, '-')}}
+          prerelease: ${{ contains(steps.version.outputs.version, '-')}}
           files: "./${{steps.zipname.outputs.zipname}}"
+          tag_name: "v${{steps.version.outputs.version}}"
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
