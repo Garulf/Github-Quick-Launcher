@@ -1,0 +1,26 @@
+{
+  "keyword": "gr",
+  "query": "*py",
+  "icon": "../../data/icon.png",
+  "max_results": 3,
+  "selection": 0,
+  "results": [
+    {
+      "title": "python/cpython",
+      "subtitle": "The Python programming language",
+      "icon": "../../data/icon.png"
+    },
+    {
+      "title": "pytest-dev/pytest",
+      "subtitle": "The pytest framework",
+      "icon": "../../data/icon.png"
+    },
+    {
+      "title": "encode/httpx",
+      "subtitle": "A next generation HTTP client for Python",
+      "icon": "../../data/icon.png"
+    }
+  ],
+  "query_suggestion": "",
+  "show_caret": false
+}

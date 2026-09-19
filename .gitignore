@@ -124,3 +124,10 @@ bin/
 
 *.zip
 *.sqlite
+
+.venv/
+.cache/
+site-packages/
+
+# Temporary per-theme configs written by docs/screenshots/render.sh
+docs/screenshots/.*.json

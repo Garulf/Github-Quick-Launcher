@@ -1,0 +1,26 @@
+{
+  "keyword": "gr",
+  "query": "flow launcher",
+  "icon": "../../data/icon.png",
+  "max_results": 3,
+  "selection": 0,
+  "results": [
+    {
+      "title": "Flow-Launcher/Flow.Launcher",
+      "subtitle": "Quick file search and app launcher for Windows",
+      "icon": "../../data/icon.png"
+    },
+    {
+      "title": "octo-dev/flow-widgets",
+      "subtitle": "Widgets for flow based UIs",
+      "icon": "../../data/icon.png"
+    },
+    {
+      "title": "example-org/launcher-kit",
+      "subtitle": "Build your own launcher",
+      "icon": "../../data/icon.png"
+    }
+  ],
+  "query_suggestion": "",
+  "show_caret": false
+}

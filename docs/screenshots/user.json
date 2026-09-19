@@ -1,0 +1,26 @@
+{
+  "keyword": "gr",
+  "query": "torvalds/",
+  "icon": "../../data/icon.png",
+  "max_results": 3,
+  "selection": 0,
+  "results": [
+    {
+      "title": "torvalds/linux",
+      "subtitle": "Linux kernel source tree",
+      "icon": "../../data/icon.png"
+    },
+    {
+      "title": "torvalds/subsurface-for-dirk",
+      "subtitle": "Do not use - the real upstream is Subsurface-divelog/subsurface",
+      "icon": "../../data/icon.png"
+    },
+    {
+      "title": "torvalds/uemacs",
+      "subtitle": "Random version of microemacs with my private modificatons",
+      "icon": "../../data/icon.png"
+    }
+  ],
+  "query_suggestion": "",
+  "show_caret": false
+}

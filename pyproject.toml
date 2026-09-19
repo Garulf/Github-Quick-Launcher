@@ -1,0 +1,38 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "github-quick-launcher"
+authors = [
+    {name = "Garulf"}
+]
+version = "4.0.0" # x-release-please-version
+description = "Quickly access your personal repositories and stars from Flow Launcher"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+dependencies = [
+    "pyflowlauncher>=1.2.1",
+    "httpx",
+]
+
+[project.urls]
+Repository = "https://github.com/Garulf/Github-Quick-Launcher"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/github_quick_launcher"]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "pytest-httpx",
+    "flake8",
+    "mypy",
+    "tox",
+    "tox-uv",
+    "pre-commit",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

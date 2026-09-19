@@ -1,0 +1,26 @@
+{
+  "keyword": "gr",
+  "query": "/dotfiles",
+  "icon": "../../data/icon.png",
+  "max_results": 3,
+  "selection": 0,
+  "results": [
+    {
+      "title": "Open in browser",
+      "subtitle": "Open repository in browser",
+      "icon": "../../data/icon.png"
+    },
+    {
+      "title": "Open with GitHub Desktop",
+      "subtitle": "Open repository in GitHub Desktop",
+      "icon": "../../data/icon.png"
+    },
+    {
+      "title": "Clone with SSH",
+      "subtitle": "git@github.com:octo-dev/dotfiles.git",
+      "icon": "../../data/icon.png"
+    }
+  ],
+  "query_suggestion": "",
+  "show_caret": false
+}

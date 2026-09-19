@@ -1,0 +1,26 @@
+{
+  "keyword": "gr",
+  "query": "/",
+  "icon": "../../data/icon.png",
+  "max_results": 3,
+  "selection": 0,
+  "results": [
+    {
+      "title": "octo-dev/dotfiles",
+      "subtitle": "My dotfiles",
+      "icon": "../../data/icon.png"
+    },
+    {
+      "title": "octo-dev/flow-widgets",
+      "subtitle": "Widgets for flow based UIs",
+      "icon": "../../data/icon.png"
+    },
+    {
+      "title": "octo-dev/weather-cli",
+      "subtitle": "Forecasts in your terminal",
+      "icon": "../../data/icon.png"
+    }
+  ],
+  "query_suggestion": "",
+  "show_caret": false
+}

@@ -1,0 +1,10 @@
+project:
+  name: Github-Quick-Launcher
+  tagline: Quickly access your GitHub repositories and stars from Flow Launcher
+  license: MIT
+badges:
+  - {preset: ci, workflow: ci.yml}
+  - github-release
+donate_handles:
+  buymeacoffee: garulf
+donate: [buymeacoffee]

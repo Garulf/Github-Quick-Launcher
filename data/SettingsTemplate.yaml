@@ -1,0 +1,22 @@
+body:
+  - type: input
+    attributes:
+      name: username
+      label: "GitHub username:"
+      defaultValue: ""
+      description: >
+        Your GitHub username. With this set, typing "/" lists your public repositories and "*" lists your public stars. Not needed if you provide a token.
+  - type: passwordBox
+    attributes:
+      name: token
+      label: "Personal access token:"
+      defaultValue: ""
+      description: >
+        Optional. Adds private and organization repositories and raises the GitHub API rate limit. A token with minimal scopes is enough; allow read:org to include organization repositories.
+  - type: input
+    attributes:
+      name: cache_ttl_minutes
+      label: "Cache lifetime (minutes):"
+      defaultValue: "10"
+      description: >
+        How long your repository list is reused before it is refreshed in the background.

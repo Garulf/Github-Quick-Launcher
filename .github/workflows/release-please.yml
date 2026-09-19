@@ -1,0 +1,83 @@
+name: release-please
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release-please.outputs.release_created }}
+      tag_name: ${{ steps.release-please.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release-please
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  package:
+    name: Package and upload release archive
+    runs-on: ubuntu-latest
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Stage build files
+        id: stage
+        shell: bash
+        run: |
+          build_dir="$RUNNER_TEMP/build"
+          mkdir -p "$build_dir/site-packages"
+          cp run.py LICENSE "$build_dir/"
+          cp data/icon.png data/plugin.json data/SettingsTemplate.yaml "$build_dir/"
+          echo "build_dir=$build_dir" >> "$GITHUB_OUTPUT"
+
+      - name: Install package into site-packages
+        shell: bash
+        # Resolve dependencies for the oldest Python the plugin supports, not
+        # for the Python running this job, so markers such as
+        # exceptiongroup; python_version < "3.11" are kept in the archive.
+        run: |
+          wheel_dir="$RUNNER_TEMP/wheel"
+          python -m pip install --upgrade pip
+          python -m pip wheel . --no-deps -w "$wheel_dir"
+          uv pip install "$wheel_dir"/*.whl \
+            --target "${{ steps.stage.outputs.build_dir }}/site-packages" \
+            --python-version 3.9 \
+            --only-binary=:all:
+
+      - name: Create release archive
+        id: archive
+        shell: bash
+        run: |
+          version="${{ needs.release-please.outputs.tag_name }}"
+          version="${version#v}"
+          zip_path="$RUNNER_TEMP/Github-Quick-Launcher-${version}.zip"
+          (cd "${{ steps.stage.outputs.build_dir }}" && zip -r "$zip_path" .)
+          echo "zip_path=$zip_path" >> "$GITHUB_OUTPUT"
+
+      - name: Upload archive to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ needs.release-please.outputs.tag_name }}" "${{ steps.archive.outputs.zip_path }}" --clobber

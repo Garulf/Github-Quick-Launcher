@@ -1,15 +1,24 @@
+from __future__ import annotations
+
 import pytest
 
-from src.query import query
+from github_quick_launcher.query import Global, Own, Refresh, Stars, UserSearch, route
 
 
-@pytest.mark.vcr
-def test_query():
-    assert query("tetris")["result"][0]["Title"] == 'chvin/react-tetris'
-
-
-@pytest.mark.vcr
-def test_query_user():
-    query_result = query("garulf/")
-    for result in query_result["result"]:
-        assert result["Title"].startswith("Garulf/")
+@pytest.mark.parametrize("text, expected", [
+    ("", Own("")),
+    ("   ", Own("")),
+    ("/", Own("")),
+    ("/flow", Own("flow")),
+    ("/ flow ", Own("flow")),
+    ("*", Stars("")),
+    ("*render", Stars("render")),
+    ("garulf/", UserSearch("garulf", "")),
+    ("garulf/flow", UserSearch("garulf", "flow")),
+    ("garulf/flow/extra", UserSearch("garulf", "flow/extra")),
+    ("flow launcher", Global("flow launcher")),
+    ("!refresh", Refresh()),
+    ("!REFRESH ", Refresh()),
+])
+def test_route(text, expected):
+    assert route(text) == expected
