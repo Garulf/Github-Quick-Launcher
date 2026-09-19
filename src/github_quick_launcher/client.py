@@ -19,6 +19,10 @@ class BadCredentials(GitHubError):
     pass
 
 
+class NotFound(GitHubError):
+    pass
+
+
 class Offline(GitHubError):
     pass
 
@@ -70,6 +74,8 @@ def _raise_for_status(response: httpx.Response) -> None:
         return
     if status == 401:
         raise BadCredentials("GitHub rejected the token")
+    if status == 404:
+        raise NotFound("GitHub has no such user or repository list")
     if status in (403, 429) and response.headers.get("X-RateLimit-Remaining") == "0":
         raise RateLimited(int(response.headers.get("X-RateLimit-Reset", "0")))
     raise GitHubError(f"GitHub returned HTTP {status}")

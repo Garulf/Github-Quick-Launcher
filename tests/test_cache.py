@@ -139,6 +139,43 @@ async def test_background_failure_keeps_stale_repos_and_records_error(tmp_path):
     assert isinstance(store.last_error, Offline)
 
 
+async def test_snapshot_on_a_cold_store_is_empty_and_starts_one_refresh(tmp_path):
+    fetch = FakeFetch(Listing([ONE], '"v1"'))
+    fetch.gate.clear()
+    store = RepoStore(tmp_path / "repos.json", 600, fetch, FakeClock())
+
+    assert store.snapshot() == []
+    assert store.snapshot() == []
+    fetch.gate.set()
+    await store._refresh_task
+
+    assert fetch.etags == [None]
+    assert store.snapshot() == [ONE]
+
+
+async def test_snapshot_serves_stale_repos_while_refreshing(tmp_path):
+    clock = FakeClock()
+    fetch = FakeFetch(Listing([ONE], '"v1"'), Listing([ONE, TWO], '"v2"'))
+    store = RepoStore(tmp_path / "repos.json", 600, fetch, clock)
+    await store.repos()
+
+    clock.now += 601
+    assert store.snapshot() == [ONE]
+    await store._refresh_task
+
+    assert fetch.etags == [None, '"v1"']
+    assert store.snapshot() == [ONE, TWO]
+
+
+async def test_snapshot_never_raises_when_the_refresh_fails(tmp_path):
+    store = RepoStore(tmp_path / "repos.json", 600, FakeFetch(Offline("down")), FakeClock())
+
+    assert store.snapshot() == []
+    await store._refresh_task
+
+    assert isinstance(store.last_error, Offline)
+
+
 async def test_corrupt_cache_file_is_ignored(tmp_path):
     (tmp_path / "repos.json").write_text("{not json")
     store = RepoStore(tmp_path / "repos.json", 600, FakeFetch(Listing([ONE], None)), FakeClock())

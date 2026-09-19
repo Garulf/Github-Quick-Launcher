@@ -4,7 +4,7 @@ import httpx
 import pytest
 
 from github_quick_launcher.client import (
-    BadCredentials, GitHubClient, Offline, RateLimited, Repo, build_http,
+    BadCredentials, GitHubClient, NotFound, Offline, RateLimited, Repo, build_http,
 )
 
 API = "https://api.github.com"
@@ -82,6 +82,13 @@ async def test_exhausted_rate_limit_raises_rate_limited(client, httpx_mock):
     with pytest.raises(RateLimited) as raised:
         await client.list_repos("/user/repos")
     assert raised.value.reset_at == 1700000000
+
+
+async def test_404_raises_not_found(client, httpx_mock):
+    httpx_mock.add_response(url=f"{API}/users/ghost/repos?per_page=100&sort=updated",
+                            status_code=404)
+    with pytest.raises(NotFound):
+        await client.list_repos("/users/ghost/repos")
 
 
 async def test_transport_failure_raises_offline(client, httpx_mock):

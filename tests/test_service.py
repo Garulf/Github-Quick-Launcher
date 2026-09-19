@@ -67,6 +67,20 @@ async def test_without_identity_lists_are_empty_and_nothing_is_fetched(tmp_path)
     assert client.listed == []
 
 
+async def test_own_snapshot_returns_memory_without_waiting(tmp_path):
+    client = FakeClient()
+    service = RepoService(Settings(username="garulf"), client, tmp_path, FakeClock())
+
+    assert service.own_snapshot() == []
+    assert await service.own_repos() == [ONE]
+    assert service.own_snapshot() == [ONE]
+
+
+def test_own_snapshot_without_identity_is_empty(tmp_path):
+    service = RepoService(Settings(), FakeClient(), tmp_path, FakeClock())
+    assert service.own_snapshot() == []
+
+
 async def test_search_is_memoized_for_sixty_seconds(tmp_path):
     client, clock = FakeClient(), FakeClock()
     service = RepoService(Settings(), client, tmp_path, clock)

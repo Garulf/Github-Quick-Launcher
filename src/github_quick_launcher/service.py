@@ -54,6 +54,9 @@ class RepoService:
     async def own_repos(self) -> List[Repo]:
         return await self._own.repos() if self._own is not None else []
 
+    def own_snapshot(self) -> List[Repo]:
+        return self._own.snapshot() if self._own is not None else []
+
     async def starred(self) -> List[Repo]:
         return await self._stars.repos() if self._stars is not None else []
 

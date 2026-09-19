@@ -10,7 +10,7 @@ from pyflowlauncher import Plugin, Result
 from pyflowlauncher.utils import score_results
 
 from github_quick_launcher.client import (
-    BadCredentials, GitHubError, Offline, RateLimited, Repo,
+    BadCredentials, GitHubError, NotFound, Offline, RateLimited, Repo,
 )
 from github_quick_launcher.query import Global, Own, Refresh, Stars, UserSearch, route
 from github_quick_launcher.service import RepoService
@@ -100,6 +100,12 @@ def build(plugin: Plugin, service_for: Callable[[], RepoService]) -> Handlers:
                 "Press Enter to open settings and replace it",
                 PLUGIN_ICON,
             ).add_action(api.open_setting_dialog())
+        if isinstance(error, NotFound):
+            return Result(
+                "GitHub user not found",
+                "Press Enter to open settings and check the username",
+                PLUGIN_ICON,
+            ).add_action(api.open_setting_dialog())
         if isinstance(error, Offline):
             return Result("Can't reach GitHub", "Check your connection and try again",
                           PLUGIN_ICON)
@@ -148,7 +154,7 @@ def build(plugin: Plugin, service_for: Callable[[], RepoService]) -> Handlers:
             return
 
         assert isinstance(parsed, Global)
-        own_matches = ranked(parsed.text, await service.own_repos(), OWN_MATCH_BOOST)
+        own_matches = ranked(parsed.text, service.own_snapshot(), OWN_MATCH_BOOST)
         for result in own_matches:
             yield result
         try:

@@ -51,6 +51,11 @@ class RepoStore:
                 raise self.last_error
         return list(self._repos)
 
+    def snapshot(self) -> List[Repo]:
+        if self.is_stale:
+            self._start_refresh()
+        return list(self._repos)
+
     async def refresh(self) -> None:
         listing = await self._fetch(self._etag)
         if listing.repos is not None:
@@ -61,8 +66,12 @@ class RepoStore:
         self._save()
 
     def _start_refresh(self) -> None:
-        if self._refresh_task is None or self._refresh_task.done():
+        if self._refresh_task is not None and not self._refresh_task.done():
+            return
+        try:
             self._refresh_task = asyncio.create_task(self._refresh_recording_errors())
+        except RuntimeError:
+            _LOGGER.warning("No running loop to refresh the repo cache")
 
     async def _refresh_recording_errors(self) -> None:
         try:

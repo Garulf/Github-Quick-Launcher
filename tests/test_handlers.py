@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import List
+from typing import List, Optional
 
 from pyflowlauncher import Plugin
 from pyflowlauncher.jsonrpc import _json_default
@@ -9,7 +9,7 @@ from pyflowlauncher.launcher import FlowLauncherV2
 from pyflowlauncher.plugin import _default_context_menu
 
 from github_quick_launcher import handlers
-from github_quick_launcher.client import GitHubError, Offline, RateLimited, Repo
+from github_quick_launcher.client import GitHubError, NotFound, Offline, RateLimited, Repo
 
 FLOW = Repo("me/flow-thing", "A thing", "https://github.com/me/flow-thing", "https://a/me")
 OTHER = Repo("me/other", "", "https://github.com/me/other", "https://a/me")
@@ -23,6 +23,9 @@ class FakeService:
         self.has_identity = has_identity
         self.last_error = None
         self.own = [FLOW, OTHER]
+        self.in_memory: Optional[List[Repo]] = None
+        self.own_error = None
+        self.own_awaited = False
         self.stars = [STAR]
         self.search_results: List[Repo] = [REMOTE, FLOW]
         self.search_error = None
@@ -30,7 +33,13 @@ class FakeService:
         self.refreshed = False
         self.refresh_error = None
 
+    def own_snapshot(self):
+        return self.own if self.in_memory is None else self.in_memory
+
     async def own_repos(self):
+        self.own_awaited = True
+        if self.own_error is not None:
+            raise self.own_error
         return self.own
 
     async def starred(self):
@@ -91,6 +100,25 @@ async def test_global_puts_own_matches_first_and_drops_duplicates(monkeypatch):
     assert results[0].score > results[1].score
 
 
+async def test_global_never_waits_on_the_repo_list(monkeypatch):
+    service = FakeService()
+    service.in_memory = []
+    service.own_error = Offline("down")
+    built = build(service, monkeypatch)
+
+    assert await titles(built, "flow") == ["org/flow-remote", "me/flow-thing"]
+    assert service.own_awaited is False
+
+
+async def test_global_hides_a_repo_list_failure(monkeypatch):
+    service = FakeService()
+    service.in_memory = []
+    service.last_error = NotFound("no such user")
+
+    assert await titles(build(service, monkeypatch), "flow") == [
+        "org/flow-remote", "me/flow-thing"]
+
+
 async def test_global_search_failure_keeps_own_matches_and_explains(monkeypatch):
     service = FakeService()
     service.search_error = Offline("down")
@@ -132,6 +160,14 @@ def test_error_results_cover_every_github_error():
     built = handlers.build(plugin, lambda: FakeService())
     assert built.error_result(RateLimited(0)).title == "GitHub rate limit reached"
     assert built.error_result(GitHubError("HTTP 500")).title == "GitHub request failed"
+
+
+def test_not_found_points_at_the_username_setting():
+    built = handlers.build(Plugin(launcher=FlowLauncherV2()), lambda: FakeService())
+    result = built.error_result(NotFound("missing"))
+    assert result.title == "GitHub user not found"
+    assert result.subtitle == "Press Enter to open settings and check the username"
+    assert result.json_rpc_action["Method"].endswith("OpenSettingDialog")
 
 
 async def test_refresh_failure_reports_the_error_instead_of_hiding_it(monkeypatch):
