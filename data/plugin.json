@@ -5,8 +5,8 @@
   "Description": "Quickly access your personal repositories and stars.",
   "Author": "Garulf",
   "Version": "4.0.0",
-  "Language": "python",
+  "Language": "python_v2",
   "Website": "https://github.com/Garulf/github-quick-launcher",
-  "IcoPath": "./icon.png",
-  "ExecuteFileName": "Github-Quick-Launcher.pyz"
+  "IcoPath": "icon.png",
+  "ExecuteFileName": "run.py"
 }

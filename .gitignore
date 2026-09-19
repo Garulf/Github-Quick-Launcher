@@ -124,3 +124,7 @@ bin/
 
 *.zip
 *.sqlite
+
+.venv/
+.cache/
+site-packages/
