@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import json
 from typing import List
 
 from pyflowlauncher import Plugin
+from pyflowlauncher.jsonrpc import _json_default
 from pyflowlauncher.launcher import FlowLauncherV2
+from pyflowlauncher.plugin import _default_context_menu
 
 from github_quick_launcher import handlers
 from github_quick_launcher.client import GitHubError, Offline, RateLimited, Repo
@@ -25,6 +28,7 @@ class FakeService:
         self.search_error = None
         self.searched: List[str] = []
         self.refreshed = False
+        self.refresh_error = None
 
     async def own_repos(self):
         return self.own
@@ -39,6 +43,8 @@ class FakeService:
         return self.search_results
 
     async def refresh_all(self):
+        if self.refresh_error is not None:
+            raise self.refresh_error
         self.refreshed = True
 
 
@@ -126,3 +132,26 @@ def test_error_results_cover_every_github_error():
     built = handlers.build(plugin, lambda: FakeService())
     assert built.error_result(RateLimited(0)).title == "GitHub rate limit reached"
     assert built.error_result(GitHubError("HTTP 500")).title == "GitHub request failed"
+
+
+async def test_refresh_failure_reports_the_error_instead_of_hiding_it(monkeypatch):
+    service = FakeService()
+    service.refresh_error = Offline("down")
+    built = build(service, monkeypatch)
+
+    command = await built.refresh_cache()
+
+    assert command["Method"].endswith("ShowMsg")
+    assert command["Parameters"][1] == "Can't reach GitHub"
+
+
+async def test_context_menu_round_trips_through_json(monkeypatch):
+    results = [r async for r in build(FakeService(), monkeypatch).query("/flow")]
+    repo_result = results[0]
+
+    wire = json.loads(json.dumps(repo_result.to_json(), default=_json_default))
+    rebuilt = _default_context_menu(wire["ContextData"])
+
+    assert len(rebuilt) == 8
+    assert rebuilt[0].json_rpc_action["Method"].endswith("OpenUrl")
+    assert rebuilt[0].json_rpc_action["Parameters"][0] == FLOW.html_url

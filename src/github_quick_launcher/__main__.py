@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 from pathlib import Path
-from typing import Mapping, Optional
+from typing import Mapping, Optional, Set
 
 from pyflowlauncher import Plugin
 
@@ -14,8 +14,11 @@ from github_quick_launcher.settings import Settings
 
 plugin = Plugin()
 
+RETIRE_GRACE_SECONDS = 30.0
+
 _service: Optional[RepoService] = None
 _service_settings: Optional[Settings] = None
+_retiring: Set["asyncio.Task[None]"] = set()
 
 
 def _root_dir() -> Path:
@@ -33,6 +36,21 @@ def _cache_dir(root_dir: Path, env: Mapping[str, str]) -> Path:
     return root_dir / ".cache"
 
 
+def _retire(old_service: RepoService) -> None:
+    # A settings edit swaps in a new service on the next keystroke, but Flow
+    # re-sends settings with every query, so a query already in flight may
+    # still be awaiting the old client. Give it a grace period before
+    # closing it instead of racing that in-flight work with an immediate
+    # aclose(). Called only from a running handler, so a loop always exists.
+    async def close_after_grace() -> None:
+        await asyncio.sleep(RETIRE_GRACE_SECONDS)
+        await old_service.aclose()
+
+    task = asyncio.get_running_loop().create_task(close_after_grace())
+    _retiring.add(task)
+    task.add_done_callback(_retiring.discard)
+
+
 def _service_for_current_settings() -> RepoService:
     # plugin.settings is empty until the first request arrives, and changes
     # whenever the user edits settings, so the service is rebuilt on change.
@@ -40,7 +58,7 @@ def _service_for_current_settings() -> RepoService:
     settings = Settings.from_raw(plugin.settings)
     if _service is None or settings != _service_settings:
         if _service is not None:
-            asyncio.ensure_future(_service.aclose())
+            _retire(_service)
         client = GitHubClient(build_http(settings.token))
         _service = RepoService(settings, client, _cache_dir(_root_dir(), os.environ))
         _service_settings = settings

@@ -112,12 +112,15 @@ def build(plugin: Plugin, service_for: Callable[[], RepoService]) -> Handlers:
         return await service.search(q)
 
     async def refresh_cache() -> Any:
-        await service_for().refresh_all()
+        try:
+            await service_for().refresh_all()
+        except GitHubError as error:
+            return api.show_msg("Github Quick Launcher", error_result(error).title)
         return api.show_msg("Github Quick Launcher", "Repository cache refreshed")
 
-    async def query(query: str) -> AsyncIterator[Result]:
+    async def query(text: str) -> AsyncIterator[Result]:
         service = service_for()
-        parsed = route(query)
+        parsed = route(text)
 
         if isinstance(parsed, Refresh):
             yield Result(
