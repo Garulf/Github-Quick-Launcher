@@ -66,6 +66,8 @@ Your repositories and stars are kept in memory and on disk, so `/` and `*` answe
 
 Issues and pull requests are welcome at [Garulf/Github-Quick-Launcher](https://github.com/Garulf/Github-Quick-Launcher).
 
+Screenshots are re-rendered with `docs/screenshots/render.sh` from the repo root.
+
 ## License
 
 MIT
