@@ -7,7 +7,7 @@ name = "github-quick-launcher"
 authors = [
     {name = "Garulf"}
 ]
-version = "4.0.0" # x-release-please-version
+version = "5.0.0" # x-release-please-version
 description = "Quickly access your personal repositories and stars from Flow Launcher"
 requires-python = ">=3.9"
 license = { text = "MIT" }
