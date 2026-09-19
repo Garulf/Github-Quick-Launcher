@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from dataclasses import dataclass
 from typing import Any, Mapping, Optional
 
 DEFAULT_TTL_MINUTES = 10
+LOGIN_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$")
 
 
 def _positive_int(value: Any, default: int) -> int:
@@ -13,6 +15,14 @@ def _positive_int(value: Any, default: int) -> int:
     except (TypeError, ValueError):
         return default
     return number if number > 0 else default
+
+
+def _clean_username(value: Any) -> str:
+    text = str(value or "").strip()
+    if ".." in text:
+        return ""
+    text = text.rstrip("/").rsplit("/", 1)[-1].lstrip("@")
+    return text if LOGIN_RE.fullmatch(text) else ""
 
 
 @dataclass(frozen=True)
@@ -24,7 +34,7 @@ class Settings:
     @classmethod
     def from_raw(cls, raw: Mapping[str, Any]) -> Settings:
         return cls(
-            username=str(raw.get("username") or "").strip().lstrip("@"),
+            username=_clean_username(raw.get("username")),
             token=str(raw.get("token") or "").strip(),
             cache_ttl_minutes=_positive_int(raw.get("cache_ttl_minutes"), DEFAULT_TTL_MINUTES),
         )

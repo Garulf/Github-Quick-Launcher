@@ -1,6 +1,27 @@
 from __future__ import annotations
 
+import pytest
+
 from github_quick_launcher.settings import Settings
+
+
+@pytest.mark.parametrize("raw, expected", [
+    ("https://github.com/Garulf", "Garulf"),
+    ("github.com/Garulf/", "Garulf"),
+    ("  @Garulf ", "Garulf"),
+    ("../../etc", ""),
+    ("a/../b?x", ""),
+    ("gar ulf", ""),
+    ("-lead", ""),
+    ("a" * 40, ""),
+    ("naïve", ""),
+])
+def test_username_is_normalized_and_validated(raw, expected):
+    settings = Settings.from_raw({"username": raw})
+    assert settings.username == expected
+    if expected == "":
+        assert settings.identity_key is None
+        assert settings.has_identity is False
 
 
 def test_empty_settings_have_no_identity():

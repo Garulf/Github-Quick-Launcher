@@ -89,6 +89,17 @@ async def test_refresh_all_refetches_both_lists(tmp_path):
     assert client.listed == ["/user/repos", "/user/repos", "/user/starred"]
 
 
+async def test_invalid_username_has_no_identity_and_writes_nothing(tmp_path):
+    client = FakeClient()
+    settings = Settings.from_raw({"username": "../../escape"})
+    service = RepoService(settings, client, tmp_path, FakeClock())
+
+    assert service.has_identity is False
+    assert await service.own_repos() == []
+    assert client.listed == []
+    assert list(tmp_path.iterdir()) == []
+
+
 async def test_aclose_closes_the_client(tmp_path):
     client = FakeClient()
     await RepoService(Settings(), client, tmp_path, FakeClock()).aclose()
