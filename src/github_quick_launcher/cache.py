@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import time
 from dataclasses import asdict
@@ -11,6 +12,8 @@ from typing import Awaitable, Callable, List, Optional
 from github_quick_launcher.client import GitHubError, Listing, Repo
 
 Fetch = Callable[[Optional[str]], Awaitable[Listing]]
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class RepoStore:
@@ -66,6 +69,11 @@ class RepoStore:
             await self.refresh()
         except GitHubError as exc:
             self.last_error = exc
+        except Exception as exc:
+            _LOGGER.exception("Unexpected error refreshing repo cache")
+            error = GitHubError(f"Refresh failed: {exc}")
+            error.__cause__ = exc
+            self.last_error = error
 
     def _load(self) -> None:
         try:

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import gc
 import json
 
 import pytest
 
 from github_quick_launcher.cache import RepoStore
-from github_quick_launcher.client import Listing, Offline, Repo
+from github_quick_launcher.client import GitHubError, Listing, Offline, Repo
 
 ONE = Repo("me/one", "", "https://github.com/me/one", "")
 TWO = Repo("me/two", "", "https://github.com/me/two", "")
@@ -142,3 +143,37 @@ async def test_corrupt_cache_file_is_ignored(tmp_path):
     (tmp_path / "repos.json").write_text("{not json")
     store = RepoStore(tmp_path / "repos.json", 600, FakeFetch(Listing([ONE], None)), FakeClock())
     assert await store.repos() == [ONE]
+
+
+async def test_unexpected_background_failure_is_recorded_not_lost(tmp_path):
+    clock = FakeClock()
+    fetch = FakeFetch(Listing([ONE], '"v1"'), ValueError("truncated body"))
+    store = RepoStore(tmp_path / "repos.json", 600, fetch, clock)
+    await store.repos()
+
+    clock.now += 601
+    loop = asyncio.get_running_loop()
+    unhandled = []
+    old_handler = loop.get_exception_handler()
+    loop.set_exception_handler(lambda loop, context: unhandled.append(context))
+    try:
+        assert await store.repos() == [ONE]
+        task = store._refresh_task
+        await task
+        del task
+        gc.collect()
+        await asyncio.sleep(0)
+    finally:
+        loop.set_exception_handler(old_handler)
+
+    assert isinstance(store.last_error, GitHubError)
+    assert not isinstance(store.last_error, ValueError)
+    assert unhandled == []
+
+
+async def test_cold_unexpected_failure_raises_github_error(tmp_path):
+    fetch = FakeFetch(ValueError("truncated body"))
+    store = RepoStore(tmp_path / "repos.json", 600, fetch, FakeClock())
+    with pytest.raises(GitHubError) as exc_info:
+        await store.repos()
+    assert not isinstance(exc_info.value, ValueError)
