@@ -71,9 +71,17 @@ class RepoService:
         return repos
 
     async def refresh_all(self) -> None:
+        first_failure: Optional[BaseException] = None
         for store in (self._own, self._stars):
-            if store is not None:
+            if store is None:
+                continue
+            try:
                 await store.refresh()
+            except Exception as failure:
+                if first_failure is None:
+                    first_failure = failure
+        if first_failure is not None:
+            raise first_failure
 
     async def aclose(self) -> None:
         await self._client.aclose()

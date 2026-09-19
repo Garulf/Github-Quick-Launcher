@@ -181,6 +181,17 @@ async def test_refresh_failure_reports_the_error_instead_of_hiding_it(monkeypatc
     assert command["Parameters"][1] == "Can't reach GitHub"
 
 
+async def test_refresh_without_identity_asks_for_settings_instead(monkeypatch):
+    service = FakeService(has_identity=False)
+    built = build(service, monkeypatch)
+
+    command = await built.refresh_cache()
+
+    assert command["Method"].endswith("ShowMsg")
+    assert command["Parameters"][1] == "Set your GitHub username or token first"
+    assert service.refreshed is False
+
+
 async def test_context_menu_round_trips_through_json(monkeypatch):
     results = [r async for r in build(FakeService(), monkeypatch).query("/flow")]
     repo_result = results[0]

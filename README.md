@@ -60,7 +60,7 @@ Press Shift+Enter or right-click a repository to open it in GitHub Desktop or VS
 
 ## Speed
 
-Your repositories and stars are kept in memory and on disk, so `/` and `*` answer instantly, even right after Flow Launcher starts. The list refreshes in the background once it is older than the cache lifetime, using conditional requests that do not count against GitHub's rate limit when nothing changed.
+The first `/` or `*` after you set your username waits for GitHub. After that sync, your repositories and stars are kept in memory and on disk, so both answer from the local copy, even right after Flow Launcher starts. The list refreshes in the background once it is older than the cache lifetime, using conditional requests that do not count against GitHub's rate limit when nothing changed.
 
 ## Contributing
 

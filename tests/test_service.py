@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Dict, List, Optional
 
-from github_quick_launcher.client import Listing, Repo
+import pytest
+
+from github_quick_launcher.client import Listing, Offline, Repo
 from github_quick_launcher.service import RepoService, listing_paths
 from github_quick_launcher.settings import Settings
 
@@ -16,9 +18,13 @@ class FakeClient:
         self.listed: List[str] = []
         self.searched: List[str] = []
         self.closed = False
+        self.fail_for: Dict[str, Exception] = {}
 
     async def list_repos(self, path: str, etag: Optional[str] = None) -> Listing:
         self.listed.append(path)
+        failure = self.fail_for.get(path)
+        if failure is not None:
+            raise failure
         return Listing([STAR] if path.endswith("starred") else [ONE], '"v1"')
 
     async def search(self, q: str, limit: int = 15) -> List[Repo]:
@@ -101,6 +107,17 @@ async def test_refresh_all_refetches_both_lists(tmp_path):
     await service.refresh_all()
 
     assert client.listed == ["/user/repos", "/user/repos", "/user/starred"]
+
+
+async def test_refresh_all_refreshes_stars_even_when_repos_fail(tmp_path):
+    client = FakeClient()
+    client.fail_for["/user/repos"] = Offline("down")
+    service = RepoService(Settings(token="t"), client, tmp_path, FakeClock())
+
+    with pytest.raises(Offline):
+        await service.refresh_all()
+
+    assert client.listed == ["/user/repos", "/user/starred"]
 
 
 async def test_invalid_username_has_no_identity_and_writes_nothing(tmp_path):

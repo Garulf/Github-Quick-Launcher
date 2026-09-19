@@ -118,8 +118,12 @@ def build(plugin: Plugin, service_for: Callable[[], RepoService]) -> Handlers:
         return await service.search(q)
 
     async def refresh_cache() -> Any:
+        service = service_for()
+        if not service.has_identity:
+            return api.show_msg(
+                "Github Quick Launcher", "Set your GitHub username or token first")
         try:
-            await service_for().refresh_all()
+            await service.refresh_all()
         except GitHubError as error:
             return api.show_msg("Github Quick Launcher", error_result(error).title)
         return api.show_msg("Github Quick Launcher", "Repository cache refreshed")
