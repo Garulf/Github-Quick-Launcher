@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from typing import Any, List, Mapping, Optional
 
@@ -7,8 +8,11 @@ import httpx
 
 API_URL = "https://api.github.com"
 PER_PAGE = 100
+MAX_PAGES = 10
 SEARCH_LIMIT = 15
 TIMEOUT_SECONDS = 10.0
+
+_now = time.time
 
 
 class GitHubError(Exception):
@@ -76,9 +80,23 @@ def _raise_for_status(response: httpx.Response) -> None:
         raise BadCredentials("GitHub rejected the token")
     if status == 404:
         raise NotFound("GitHub has no such user or repository list")
-    if status in (403, 429) and response.headers.get("X-RateLimit-Remaining") == "0":
-        raise RateLimited(int(response.headers.get("X-RateLimit-Reset", "0")))
+    if status in (403, 429):
+        if response.headers.get("X-RateLimit-Remaining") == "0":
+            raise RateLimited(int(response.headers.get("X-RateLimit-Reset", "0")))
+        retry_after = _retry_after_seconds(response)
+        if retry_after is not None:
+            raise RateLimited(int(_now()) + retry_after)
     raise GitHubError(f"GitHub returned HTTP {status}")
+
+
+def _retry_after_seconds(response: httpx.Response) -> Optional[int]:
+    header = response.headers.get("Retry-After")
+    if header is None:
+        return None
+    try:
+        return max(0, int(header.strip()))
+    except ValueError:
+        return None
 
 
 class GitHubClient:
@@ -103,9 +121,11 @@ class GitHubClient:
             return Listing(None, etag)
         fresh_etag = response.headers.get("ETag")
         repos = [Repo.from_api(item) for item in response.json()]
-        while "next" in response.links:
+        pages = 1
+        while "next" in response.links and pages < MAX_PAGES:
             response = await self._get(response.links["next"]["url"])
             repos.extend(Repo.from_api(item) for item in response.json())
+            pages += 1
         return Listing(repos, fresh_etag)
 
     async def search(self, q: str, limit: int = SEARCH_LIMIT) -> List[Repo]:
