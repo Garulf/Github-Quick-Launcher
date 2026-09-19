@@ -9,11 +9,15 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Awaitable, Callable, List, Optional
 
-from github_quick_launcher.client import GitHubError, Listing, Repo
+from github_quick_launcher.client import GitHubError, Listing, RateLimited, Repo
 
 Fetch = Callable[[Optional[str]], Awaitable[Listing]]
 
-_LOGGER = logging.getLogger(__name__)
+MAX_COOLDOWN_SECONDS = 60.0
+
+# pyflowlauncher attaches the plugin.log handler to its own logger, so logging
+# under a child of it is what reaches the log Flow Launcher ships to users.
+_LOGGER = logging.getLogger(f"pyflowlauncher.{__name__}")
 
 
 class RepoStore:
@@ -29,6 +33,7 @@ class RepoStore:
         self._etag: Optional[str] = None
         self._fetched_at: Optional[float] = None
         self._refresh_task: Optional[asyncio.Task] = None
+        self._failed_at: Optional[float] = None
         self.last_error: Optional[GitHubError] = None
         self._load()
 
@@ -40,19 +45,30 @@ class RepoStore:
     def is_stale(self) -> bool:
         return self._fetched_at is None or self._clock() - self._fetched_at >= self._ttl
 
+    @property
+    def _in_cooldown(self) -> bool:
+        if self._failed_at is None:
+            return False
+        until = self._failed_at + min(self._ttl, MAX_COOLDOWN_SECONDS)
+        if isinstance(self.last_error, RateLimited):
+            until = max(until, float(self.last_error.reset_at))
+        return self._clock() < until
+
     async def repos(self) -> List[Repo]:
-        if self.is_stale:
+        cooling = self._in_cooldown
+        if self.is_stale and not cooling:
             self._start_refresh()
-        if not self.has_snapshot and self._refresh_task is not None:
-            # shield: the host cancels superseded queries, which must not
-            # restart a cold fetch that the next keystroke needs too.
-            await asyncio.shield(self._refresh_task)
+        if not self.has_snapshot:
+            if self._refresh_task is not None and not cooling:
+                # shield: the host cancels superseded queries, which must not
+                # restart a cold fetch that the next keystroke needs too.
+                await asyncio.shield(self._refresh_task)
             if not self.has_snapshot and self.last_error is not None:
                 raise self.last_error
         return list(self._repos)
 
     def snapshot(self) -> List[Repo]:
-        if self.is_stale:
+        if self.is_stale and not self._in_cooldown:
             self._start_refresh()
         return list(self._repos)
 
@@ -62,6 +78,7 @@ class RepoStore:
             self._repos = listing.repos
             self._etag = listing.etag
         self._fetched_at = self._clock()
+        self._failed_at = None
         self.last_error = None
         self._save()
 
@@ -77,12 +94,16 @@ class RepoStore:
         try:
             await self.refresh()
         except GitHubError as exc:
-            self.last_error = exc
+            self._record_failure(exc)
         except Exception as exc:
             _LOGGER.exception("Unexpected error refreshing repo cache")
             error = GitHubError(f"Refresh failed: {exc}")
             error.__cause__ = exc
-            self.last_error = error
+            self._record_failure(error)
+
+    def _record_failure(self, error: GitHubError) -> None:
+        self.last_error = error
+        self._failed_at = self._clock()
 
     def _load(self) -> None:
         try:

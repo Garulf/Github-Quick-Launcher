@@ -7,7 +7,7 @@ import json
 import pytest
 
 from github_quick_launcher.cache import RepoStore
-from github_quick_launcher.client import GitHubError, Listing, Offline, Repo
+from github_quick_launcher.client import GitHubError, Listing, Offline, RateLimited, Repo
 
 ONE = Repo("me/one", "", "https://github.com/me/one", "")
 TWO = Repo("me/two", "", "https://github.com/me/two", "")
@@ -174,6 +174,75 @@ async def test_snapshot_never_raises_when_the_refresh_fails(tmp_path):
     await store._refresh_task
 
     assert isinstance(store.last_error, Offline)
+
+
+async def test_a_failed_fetch_is_not_retried_during_the_cooldown(tmp_path):
+    fetch = FakeFetch(Offline("down"), Offline("down"))
+    store = RepoStore(tmp_path / "repos.json", 600, fetch, FakeClock())
+
+    for _ in range(3):
+        with pytest.raises(Offline):
+            await store.repos()
+
+    assert fetch.etags == [None]
+
+
+async def test_a_retry_is_allowed_once_the_cooldown_passes(tmp_path):
+    clock = FakeClock()
+    fetch = FakeFetch(Offline("down"), Listing([ONE], '"v1"'))
+    store = RepoStore(tmp_path / "repos.json", 600, fetch, clock)
+    with pytest.raises(Offline):
+        await store.repos()
+
+    clock.now += 60
+
+    assert await store.repos() == [ONE]
+    assert fetch.etags == [None, None]
+    assert store.last_error is None
+
+
+async def test_rate_limited_waits_for_the_reset_before_retrying(tmp_path):
+    clock = FakeClock()
+    fetch = FakeFetch(RateLimited(int(clock.now) + 300), Listing([ONE], '"v1"'))
+    store = RepoStore(tmp_path / "repos.json", 600, fetch, clock)
+    with pytest.raises(RateLimited):
+        await store.repos()
+
+    clock.now += 61
+    with pytest.raises(RateLimited):
+        await store.repos()
+    assert fetch.etags == [None]
+
+    clock.now += 300
+    assert await store.repos() == [ONE]
+
+
+async def test_stale_repos_are_served_without_retrying_during_the_cooldown(tmp_path):
+    clock = FakeClock()
+    fetch = FakeFetch(Listing([ONE], '"v1"'), Offline("down"))
+    store = RepoStore(tmp_path / "repos.json", 600, fetch, clock)
+    await store.repos()
+
+    clock.now += 601
+    assert await store.repos() == [ONE]
+    await store._refresh_task
+
+    assert await store.repos() == [ONE]
+    assert store.snapshot() == [ONE]
+    assert fetch.etags == [None, '"v1"']
+    assert isinstance(store.last_error, Offline)
+
+
+async def test_explicit_refresh_ignores_the_cooldown(tmp_path):
+    fetch = FakeFetch(Offline("down"), Listing([ONE], '"v1"'))
+    store = RepoStore(tmp_path / "repos.json", 600, fetch, FakeClock())
+    with pytest.raises(Offline):
+        await store.repos()
+
+    await store.refresh()
+
+    assert fetch.etags == [None, None]
+    assert await store.repos() == [ONE]
 
 
 async def test_corrupt_cache_file_is_ignored(tmp_path):
