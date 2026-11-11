@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.1.0](https://github.com/Garulf/Github-Quick-Launcher/compare/v5.0.0...v5.1.0) (2026-11-11)
+
+
+### Features
+
+* privacy settings, lazy context menus and refresh on miss ([#44](https://github.com/Garulf/Github-Quick-Launcher/issues/44)) ([01d899c](https://github.com/Garulf/Github-Quick-Launcher/commit/01d899c741736b90ed53b0470c6937f224c06659))
+
 ## [5.0.0](https://github.com/Garulf/Github-Quick-Launcher/compare/v4.0.0...v5.0.0) (2026-09-19)
 
 
