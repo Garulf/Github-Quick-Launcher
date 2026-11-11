@@ -11,14 +11,19 @@ from pyflowlauncher import Plugin, Result
 from pyflowlauncher.plugin import _default_context_menu
 from pyflowlauncher.string_matcher import DEFAULT_QUERY_SEARCH_PRECISION, string_matcher
 
+from github_quick_launcher import avatar
 from github_quick_launcher.client import (
     BadCredentials, GitHubError, NotFound, Offline, RateLimited, Repo,
 )
-from github_quick_launcher.query import Global, Own, Refresh, Stars, UserSearch, route
+from github_quick_launcher.query import Clear, Global, Own, Refresh, Stars, UserSearch, route
 from github_quick_launcher.service import RepoService
 
 PLUGIN_ICON = "icon.png"
-DEBOUNCE_SECONDS = 0.2
+# Each global search is a GitHub API call (and a rate-limited one: 10/min
+# anonymous, 30/min with a token), so wait for a real pause in typing and
+# for enough characters to mean something before sending anything.
+DEBOUNCE_SECONDS = 0.4
+MIN_SEARCH_CHARS = 3
 PROMPT_SCORE = 1000
 OWN_MATCH_BOOST = 1000
 # Flow shows only the top handful of results, so sending every repository on
@@ -34,6 +39,7 @@ class Handlers:
     refresh_cache: Callable[[], Awaitable[Any]]
     error_result: Callable[[GitHubError], Result]
     context_menu: Callable[[Any], Optional[List[Result]]]
+    clear_cache: Callable[[], Any]
 
 
 def top_matches(
@@ -102,11 +108,18 @@ def build(plugin: Plugin, service_for: Callable[[], RepoService]) -> Handlers:
                 return context_menu(Repo(full_name, "", html_url, ""))
         return _default_context_menu(context_data)
 
-    def repo_result(repo: Repo, score: int, highlight: Optional[List[int]]) -> Result:
+    def icon_for(repo: Repo, show_avatars: bool) -> str:
+        if not show_avatars or not repo.avatar_url:
+            return PLUGIN_ICON
+        return avatar.sized(repo.avatar_url, avatar.default_size())
+
+    def repo_result(
+        repo: Repo, score: int, highlight: Optional[List[int]], show_avatars: bool,
+    ) -> Result:
         return Result(
             title=repo.full_name,
             subtitle=repo.description,
-            icon=repo.avatar_url or PLUGIN_ICON,
+            icon=icon_for(repo, show_avatars),
             score=score,
             copy_text=repo.full_name,
             context_data=[repo.full_name, repo.html_url],
@@ -114,8 +127,10 @@ def build(plugin: Plugin, service_for: Callable[[], RepoService]) -> Handlers:
             title_highlight_data=highlight,
         ).add_action(api.open_url(repo.html_url))
 
-    def ranked(text: str, repos: Sequence[Repo], boost: int = 0) -> List[Result]:
-        return [repo_result(repo, boost + score, highlight)
+    def ranked(
+        text: str, repos: Sequence[Repo], show_avatars: bool, boost: int = 0,
+    ) -> List[Result]:
+        return [repo_result(repo, boost + score, highlight, show_avatars)
                 for repo, score, highlight in top_matches(text, repos)]
 
     def settings_prompt() -> Result:
@@ -168,9 +183,30 @@ def build(plugin: Plugin, service_for: Callable[[], RepoService]) -> Handlers:
             return api.show_msg("Github Quick Launcher", error_result(error).title)
         return api.show_msg("Github Quick Launcher", "Repository cache refreshed")
 
+    def clear_cache() -> Any:
+        service_for().clear_cache()
+        return api.show_msg("Github Quick Launcher", "Cached repository lists deleted")
+
+    def online_search_disabled() -> Result:
+        return Result(
+            "Online search is off",
+            "Only your cached repositories are searched. Press Enter to change this in settings",
+            PLUGIN_ICON,
+        ).add_action(api.open_setting_dialog())
+
     async def query(text: str) -> AsyncIterator[Result]:
         service = service_for()
+        settings = service.settings
+        avatars = settings.show_avatars
         parsed = route(text)
+
+        if isinstance(parsed, Clear):
+            yield Result(
+                "Delete cached repository lists",
+                "Remove your repositories and stars stored on this PC",
+                PLUGIN_ICON,
+            ).add_action(clear_cache)
+            return
 
         if isinstance(parsed, Refresh):
             yield Result(
@@ -185,33 +221,42 @@ def build(plugin: Plugin, service_for: Callable[[], RepoService]) -> Handlers:
                 yield settings_prompt()
                 return
             fetch = service.own_repos if isinstance(parsed, Own) else service.starred
-            for result in ranked(parsed.filter, await fetch()):
+            for result in ranked(parsed.filter, await fetch(), avatars):
                 yield result
             if service.last_error is not None:
                 yield error_result(service.last_error)
             return
 
         if isinstance(parsed, UserSearch):
+            if not settings.online_search:
+                yield online_search_disabled()
+                return
             q = f"user:{parsed.user} {parsed.filter}".strip()
-            for result in ranked("", await debounced_search(service, q)):
+            for result in ranked("", await debounced_search(service, q), avatars):
                 yield result
             return
 
         assert isinstance(parsed, Global)
-        own_matches = ranked(parsed.text, service.own_snapshot(), OWN_MATCH_BOOST)
+        own_matches = ranked(parsed.text, service.own_snapshot(), avatars, OWN_MATCH_BOOST)
         for result in own_matches:
             yield result
+        if not settings.online_search:
+            return
+        if len(parsed.text.replace(" ", "")) < MIN_SEARCH_CHARS:
+            return
         try:
             found = await debounced_search(service, parsed.text)
         except GitHubError as error:
             yield error_result(error)
             return
         already_listed = {result.title for result in own_matches}
-        for result in ranked("", [repo for repo in found if repo.full_name not in already_listed]):
+        remote = [repo for repo in found if repo.full_name not in already_listed]
+        for result in ranked("", remote, avatars):
             yield result
 
     plugin.add_method(query)
     plugin.add_method(refresh_cache)
+    plugin.add_method(clear_cache)
     plugin.add_method(context_menu_handler, name="context_menu")
     plugin.add_exception_handler(GitHubError, error_result)
-    return Handlers(query, refresh_cache, error_result, context_menu_handler)
+    return Handlers(query, refresh_cache, error_result, context_menu_handler, clear_cache)

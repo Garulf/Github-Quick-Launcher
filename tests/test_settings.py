@@ -53,3 +53,12 @@ def test_invalid_ttl_falls_back_to_default():
     assert Settings.from_raw({"cache_ttl_minutes": "abc"}).cache_ttl_minutes == 10
     assert Settings.from_raw({"cache_ttl_minutes": "0"}).cache_ttl_minutes == 10
     assert Settings.from_raw({"cache_ttl_minutes": "30"}).ttl_seconds == 1800
+
+
+def test_privacy_flags_default_on_and_accept_flow_values():
+    assert Settings.from_raw({}).online_search is True
+    assert Settings.from_raw({}).show_avatars is True
+    assert Settings.from_raw({"online_search": False}).online_search is False
+    assert Settings.from_raw({"online_search": "false"}).online_search is False
+    assert Settings.from_raw({"show_avatars": "False"}).show_avatars is False
+    assert Settings.from_raw({"show_avatars": "nonsense"}).show_avatars is True

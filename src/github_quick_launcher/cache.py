@@ -7,13 +7,14 @@ import os
 import time
 from dataclasses import asdict
 from pathlib import Path
-from typing import Awaitable, Callable, List, Optional
+from typing import Awaitable, Callable, Iterable, List, Optional
 
 from github_quick_launcher.client import GitHubError, Listing, RateLimited, Repo
 
 Fetch = Callable[[Optional[str]], Awaitable[Listing]]
 
 MAX_COOLDOWN_SECONDS = 60.0
+CACHE_SUFFIXES = (".json", ".tmp")
 
 # pyflowlauncher attaches the plugin.log handler to its own logger, so logging
 # under a child of it is what reaches the log Flow Launcher ships to users.
@@ -35,7 +36,12 @@ class RepoStore:
         self._refresh_task: Optional[asyncio.Task] = None
         self._failed_at: Optional[float] = None
         self.last_error: Optional[GitHubError] = None
+        self._persist = True
         self._load()
+
+    @property
+    def path(self) -> Path:
+        return self._path
 
     @property
     def has_snapshot(self) -> bool:
@@ -82,6 +88,21 @@ class RepoStore:
         self.last_error = None
         self._save()
 
+    def stop_persisting(self) -> None:
+        """Keep serving from memory but never write this store to disk again.
+
+        Called when the store's identity is retired, so an in-flight refresh
+        cannot recreate a snapshot the user just asked to be removed.
+        """
+        self._persist = False
+
+    def clear(self) -> None:
+        self._repos, self._etag, self._fetched_at = [], None, None
+        self._failed_at = None
+        self.last_error = None
+        _remove(self._path)
+        _remove(self._path.with_suffix(".tmp"))
+
     def _start_refresh(self) -> None:
         if self._refresh_task is not None and not self._refresh_task.done():
             return
@@ -115,6 +136,8 @@ class RepoStore:
             self._repos, self._etag, self._fetched_at = [], None, None
 
     def _save(self) -> None:
+        if not self._persist:
+            return
         snapshot = {
             "fetched_at": self._fetched_at,
             "etag": self._etag,
@@ -124,3 +147,28 @@ class RepoStore:
         temporary = self._path.with_suffix(".tmp")
         temporary.write_text(json.dumps(snapshot), encoding="utf-8")
         os.replace(temporary, self._path)
+
+
+def _remove(path: Path) -> None:
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        pass
+    except OSError:
+        _LOGGER.warning("Could not remove cache file %s", path.name)
+
+
+def prune(cache_dir: Path, keep: Iterable[Path]) -> None:
+    """Delete every cached snapshot in ``cache_dir`` except ``keep``.
+
+    Snapshots of a token's repositories include private names and
+    descriptions, so they must not outlive the identity that fetched them.
+    """
+    kept = {path.name for path in keep}
+    try:
+        entries = list(cache_dir.iterdir())
+    except OSError:
+        return
+    for entry in entries:
+        if entry.suffix in CACHE_SUFFIXES and entry.name not in kept and entry.is_file():
+            _remove(entry)

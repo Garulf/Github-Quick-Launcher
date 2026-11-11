@@ -68,3 +68,37 @@ async def test_changed_settings_swaps_and_retires_the_old_service_after_grace(
 
     assert closed == [True]
     assert clean_main._retiring == set()
+
+
+async def test_removing_the_token_deletes_its_private_snapshot(clean_main, tmp_path, monkeypatch):
+    cache_dir = tmp_path / "cache"
+    monkeypatch.setattr(clean_main, "_cache_dir", lambda root, env: cache_dir)
+    _set_settings(clean_main, {"token": "ghp_" + "x" * 36})
+    service = clean_main._service_for_current_settings()
+    cache_dir.mkdir()
+    for path in service.cache_files():
+        path.write_text("{}")
+
+    _set_settings(clean_main, {"username": "octocat"})
+    clean_main._service_for_current_settings()
+
+    assert list(cache_dir.iterdir()) == []
+    for task in clean_main._retiring:
+        task.cancel()
+
+
+async def test_non_identity_setting_change_keeps_the_snapshot(clean_main, tmp_path, monkeypatch):
+    cache_dir = tmp_path / "cache"
+    monkeypatch.setattr(clean_main, "_cache_dir", lambda root, env: cache_dir)
+    _set_settings(clean_main, {"username": "octocat"})
+    service = clean_main._service_for_current_settings()
+    cache_dir.mkdir()
+    for path in service.cache_files():
+        path.write_text("{}")
+
+    _set_settings(clean_main, {"username": "octocat", "show_avatars": False})
+    clean_main._service_for_current_settings()
+
+    assert len(list(cache_dir.iterdir())) == 2
+    for task in clean_main._retiring:
+        task.cancel()

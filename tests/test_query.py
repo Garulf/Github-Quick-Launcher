@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from github_quick_launcher.query import Global, Own, Refresh, Stars, UserSearch, route
+from github_quick_launcher.query import Clear, Global, Own, Refresh, Stars, UserSearch, route
 
 
 @pytest.mark.parametrize("text, expected", [
@@ -19,6 +19,7 @@ from github_quick_launcher.query import Global, Own, Refresh, Stars, UserSearch,
     ("flow launcher", Global("flow launcher")),
     ("!refresh", Refresh()),
     ("!REFRESH ", Refresh()),
+    ("!clear", Clear()),
 ])
 def test_route(text, expected):
     assert route(text) == expected

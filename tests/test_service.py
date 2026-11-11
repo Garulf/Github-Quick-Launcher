@@ -135,3 +135,37 @@ async def test_aclose_closes_the_client(tmp_path):
     client = FakeClient()
     await RepoService(Settings(), client, tmp_path, FakeClock()).aclose()
     assert client.closed is True
+
+
+async def test_clear_cache_forgets_lists_in_memory_and_on_disk(tmp_path):
+    client = FakeClient()
+    clock = FakeClock()
+    service = RepoService(Settings(username="Garulf"), client, tmp_path, clock)
+    await service.own_repos()
+    await service.starred()
+    (tmp_path / "token-abc-repos.json").write_text("{}")
+
+    service.clear_cache()
+
+    assert list(tmp_path.iterdir()) == []
+    assert service.own_snapshot() == []
+
+
+async def test_prune_keeps_only_this_identity(tmp_path):
+    (tmp_path / "token-old-repos.json").write_text("{}")
+    (tmp_path / "token-old-stars.tmp").write_text("{}")
+    (tmp_path / "unrelated.txt").write_text("keep me")
+    service = RepoService(Settings(username="Garulf"), FakeClient(), tmp_path, FakeClock())
+    await service.own_repos()
+
+    service.prune_other_caches()
+
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["unrelated.txt", "user-garulf-repos.json"]
+
+
+async def test_retired_service_never_writes_again(tmp_path):
+    service = RepoService(Settings(username="Garulf"), FakeClient(), tmp_path, FakeClock())
+    service.retire()
+
+    assert await service.own_repos() == [ONE]
+    assert list(tmp_path.iterdir()) == []

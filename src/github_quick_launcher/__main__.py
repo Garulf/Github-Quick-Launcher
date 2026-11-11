@@ -7,7 +7,7 @@ from typing import Mapping, Optional, Set
 
 from pyflowlauncher import Plugin
 
-from github_quick_launcher import handlers
+from github_quick_launcher import handlers, redact
 from github_quick_launcher.client import GitHubClient, build_http
 from github_quick_launcher.service import RepoService
 from github_quick_launcher.settings import Settings
@@ -57,14 +57,24 @@ def _service_for_current_settings() -> RepoService:
     global _service, _service_settings
     settings = Settings.from_raw(plugin.settings)
     if _service is None or settings != _service_settings:
+        identity_changed = (
+            _service_settings is None or settings.identity_key != _service_settings.identity_key)
         if _service is not None:
+            if identity_changed:
+                _service.retire()
             _retire(_service)
+        redact.remember_secret(settings.token)
         client = GitHubClient(build_http(settings.token))
         _service = RepoService(settings, client, _cache_dir(_root_dir(), os.environ))
+        if identity_changed:
+            # A removed or replaced token must not leave its private
+            # repository list behind on disk.
+            _service.prune_other_caches()
         _service_settings = settings
     return _service
 
 
+redact.install()
 handlers.build(plugin, _service_for_current_settings)
 
 

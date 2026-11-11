@@ -9,6 +9,7 @@ from pyflowlauncher.launcher import FlowLauncherV2
 
 from github_quick_launcher import handlers
 from github_quick_launcher.client import GitHubError, NotFound, Offline, RateLimited, Repo
+from github_quick_launcher.settings import Settings
 
 FLOW = Repo("me/flow-thing", "A thing", "https://github.com/me/flow-thing", "https://a/me")
 OTHER = Repo("me/other", "", "https://github.com/me/other", "https://a/me")
@@ -18,7 +19,9 @@ REMOTE = Repo("org/flow-remote", "", "https://github.com/org/flow-remote", "http
 
 class FakeService:
 
-    def __init__(self, has_identity: bool = True) -> None:
+    def __init__(self, has_identity: bool = True, **settings) -> None:
+        self.settings = Settings(**settings)
+        self.cleared = False
         self.has_identity = has_identity
         self.last_error = None
         self.own = [FLOW, OTHER]
@@ -49,6 +52,9 @@ class FakeService:
         if self.search_error is not None:
             raise self.search_error
         return self.search_results
+
+    def clear_cache(self):
+        self.cleared = True
 
     async def refresh_all(self):
         if self.refresh_error is not None:
@@ -137,7 +143,7 @@ async def test_repo_result_opens_url_and_carries_a_context_menu(monkeypatch):
     repo_result = results[0]
     assert repo_result.json_rpc_action["Parameters"][0] == FLOW.html_url
     assert repo_result.copy_text == "me/flow-thing"
-    assert repo_result.icon == "https://a/me"
+    assert repo_result.icon == "https://a/me"  # not a GitHub avatar URL, left alone
     assert repo_result.context_data == [FLOW.full_name, FLOW.html_url]
 
 
@@ -234,3 +240,49 @@ def test_top_matches_keeps_api_order_on_ties_and_skips_non_matches():
     names = [repo.full_name for repo, _, _ in handlers.top_matches("flow", repos)]
     assert "me/other" not in names
     assert set(names) == {"me/flow-thing", "them/starred-flow"}
+
+
+async def test_short_global_queries_never_leave_the_machine(monkeypatch):
+    service = FakeService()
+    built = build(service, monkeypatch)
+
+    assert await titles(built, "fl") == ["me/flow-thing"]
+    assert service.searched == []
+
+    await titles(built, "flo")
+    assert service.searched == ["flo"]
+
+
+async def test_online_search_off_keeps_global_queries_local(monkeypatch):
+    service = FakeService(online_search=False)
+    built = build(service, monkeypatch)
+
+    assert await titles(built, "flow") == ["me/flow-thing"]
+    assert await titles(built, "garulf/flow") == ["Online search is off"]
+    assert service.searched == []
+
+
+async def test_avatars_are_downsized_or_hidden(monkeypatch):
+    monkeypatch.setattr(handlers.avatar, "_size", 64)
+    real = Repo("me/flow-x", "", "https://github.com/me/flow-x",
+                "https://avatars.githubusercontent.com/u/1?v=4")
+    service = FakeService()
+    service.own = [real]
+    shown = [r async for r in build(service, monkeypatch).query("/")]
+    assert shown[0].icon == "https://avatars.githubusercontent.com/u/1?v=4&s=64"
+
+    hidden_service = FakeService(show_avatars=False)
+    hidden_service.own = [real]
+    hidden = [r async for r in build(hidden_service, monkeypatch).query("/")]
+    assert hidden[0].icon == handlers.PLUGIN_ICON
+
+
+async def test_clear_command_deletes_cached_lists(monkeypatch):
+    service = FakeService()
+    built = build(service, monkeypatch)
+    results = [r async for r in built.query("!clear")]
+    assert results[0].json_rpc_action["Method"] == "clear_cache"
+
+    command = built.clear_cache()
+    assert service.cleared is True
+    assert command["Method"].endswith("ShowMsg")

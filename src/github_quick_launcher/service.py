@@ -4,6 +4,7 @@ import time
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
+from github_quick_launcher import cache
 from github_quick_launcher.cache import RepoStore
 from github_quick_launcher.client import GitHubClient, GitHubError, Listing, Repo
 from github_quick_launcher.settings import Settings
@@ -24,7 +25,9 @@ class RepoService:
         self, settings: Settings, client: GitHubClient, cache_dir: Path,
         clock: Callable[[], float] = time.time,
     ) -> None:
+        self.settings = settings
         self._client = client
+        self._cache_dir = cache_dir
         self._clock = clock
         self._searches: Dict[str, Tuple[float, List[Repo]]] = {}
         self._own: Optional[RepoStore] = None
@@ -39,6 +42,10 @@ class RepoService:
         async def fetch(etag: Optional[str]) -> Listing:
             return await self._client.list_repos(api_path, etag)
         return RepoStore(file, settings.ttl_seconds, fetch, self._clock)
+
+    @property
+    def _stores(self) -> List[RepoStore]:
+        return [store for store in (self._own, self._stars) if store is not None]
 
     @property
     def has_identity(self) -> bool:
@@ -82,6 +89,25 @@ class RepoService:
                     first_failure = failure
         if first_failure is not None:
             raise first_failure
+
+    def cache_files(self) -> List[Path]:
+        return [store.path for store in self._stores]
+
+    def prune_other_caches(self) -> None:
+        """Delete snapshots left behind by identities other than this one."""
+        cache.prune(self._cache_dir, self.cache_files())
+
+    def retire(self) -> None:
+        """Stop writing this identity's snapshots; their files may be deleted."""
+        for store in self._stores:
+            store.stop_persisting()
+
+    def clear_cache(self) -> None:
+        """Forget every repository list, in memory and on disk."""
+        self._searches.clear()
+        for store in self._stores:
+            store.clear()
+        cache.prune(self._cache_dir, [])
 
     async def aclose(self) -> None:
         await self._client.aclose()

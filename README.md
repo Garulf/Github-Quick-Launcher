@@ -25,12 +25,13 @@ The default action keyword is `gr`.
 
 | Query | What it does |
 | --- | --- |
-| `gr flow launcher` | Search all of GitHub. Your own matching repositories are listed first. |
+| `gr flow launcher` | Search all of GitHub once you have typed three characters. Your own matching repositories are listed first. |
 | `gr /` | List your repositories, most recently updated first. |
 | `gr /dot` | Filter your repositories. |
 | `gr *` or `gr *py` | List or filter your starred repositories. |
 | `gr torvalds/` or `gr torvalds/lin` | Search another user's repositories. |
 | `gr !refresh` | Fetch your repositories and stars again right now. |
+| `gr !clear` | Delete the repository lists cached on this PC. |
 
 ### Your repositories
 
@@ -41,8 +42,10 @@ The default action keyword is `gr`.
 | Setting | Default | Description |
 | --- | --- | --- |
 | GitHub username | empty | Lists that account's public repositories and stars. No token needed. |
-| Personal access token | empty | Adds private repositories and raises the API rate limit. No scopes are required; allow `read:org` to include organization repositories. |
+| Personal access token | empty | Adds private repositories and raises the API rate limit. Prefer a fine-grained token with an expiry and read-only *Metadata* access; a classic token needs no scopes, plus `read:org` for organization repositories. |
 | Cache lifetime (minutes) | 10 | How long the repository list is reused before it is refreshed in the background. |
+| Search all of GitHub as you type | on | Off keeps every query on this PC: only your cached repositories are searched. |
+| Show owner avatars | on | Off shows the plugin icon instead of loading avatars from GitHub. |
 
 ### Stars
 
@@ -61,6 +64,15 @@ Press Shift+Enter or right-click a repository to open it in GitHub Desktop or VS
 ## Speed
 
 The first `/` or `*` after you set your username waits for GitHub. After that sync, your repositories and stars are kept in memory and on disk, so both answer from the local copy, even right after Flow Launcher starts. The list refreshes in the background once it is older than the cache lifetime, using conditional requests that do not count against GitHub's rate limit when nothing changed.
+
+## Privacy
+
+The plugin talks only to GitHub and sends no telemetry.
+
+- **Queries.** Filtering `/` and `*` runs locally. A global query is sent to GitHub's search API only after three characters and a short pause in typing, and never when *Search all of GitHub as you type* is off. With a token set, GitHub sees these searches as yours.
+- **Avatars.** Owner avatars are loaded from `avatars.githubusercontent.com`, resized to what your display needs. Turn *Show owner avatars* off to load no images.
+- **Cache.** Your repository and star lists are stored under `%APPDATA%\FlowLauncher\Settings\Plugins\Github Quick Launcher\cache`. Lists fetched with a token include private repository names. They are deleted when you change or remove the username or token, and `gr !clear` deletes them at any time.
+- **Token.** Flow Launcher stores plugin settings, including the token, unencrypted in its settings folder. The plugin masks tokens in its own log.
 
 ## Contributing
 
