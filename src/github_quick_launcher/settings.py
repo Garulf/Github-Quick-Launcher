@@ -17,6 +17,20 @@ def _positive_int(value: Any, default: int) -> int:
     return number if number > 0 else default
 
 
+def _flag(value: Any, default: bool) -> bool:
+    # Flow stores checkboxes as JSON booleans, but sends the template's
+    # string default until the user saves the settings once.
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        text = value.strip().lower()
+        if text in ("true", "1", "yes", "on"):
+            return True
+        if text in ("false", "0", "no", "off"):
+            return False
+    return default
+
+
 def _clean_username(value: Any) -> str:
     text = str(value or "").strip()
     if ".." in text:
@@ -30,6 +44,8 @@ class Settings:
     username: str = ""
     token: str = ""
     cache_ttl_minutes: int = DEFAULT_TTL_MINUTES
+    online_search: bool = True
+    show_avatars: bool = True
 
     @classmethod
     def from_raw(cls, raw: Mapping[str, Any]) -> Settings:
@@ -37,6 +53,8 @@ class Settings:
             username=_clean_username(raw.get("username")),
             token=str(raw.get("token") or "").strip(),
             cache_ttl_minutes=_positive_int(raw.get("cache_ttl_minutes"), DEFAULT_TTL_MINUTES),
+            online_search=_flag(raw.get("online_search"), True),
+            show_avatars=_flag(raw.get("show_avatars"), True),
         )
 
     @property
