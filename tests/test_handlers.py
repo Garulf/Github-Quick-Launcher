@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from typing import List, Optional
 
+import pytest
 from pyflowlauncher import Plugin
 from pyflowlauncher.jsonrpc import _json_default
 from pyflowlauncher.launcher import FlowLauncherV2
@@ -164,7 +165,7 @@ async def test_repo_result_opens_url_and_carries_a_context_menu(monkeypatch):
     assert repo_result.json_rpc_action["Parameters"][0] == FLOW.html_url
     assert repo_result.copy_text == "me/flow-thing"
     assert repo_result.icon == "https://a/me"  # not a GitHub avatar URL, left alone
-    assert repo_result.context_data == [FLOW.full_name, FLOW.html_url]
+    assert repo_result.context_data == FLOW.full_name
 
 
 async def test_refresh_command_offers_a_refresh_action(monkeypatch):
@@ -229,10 +230,21 @@ async def test_context_menu_is_built_lazily_from_the_echoed_context_data(monkeyp
     assert menu[0].json_rpc_action["Parameters"][0] == FLOW.html_url
 
 
-def test_context_menu_rejects_data_that_is_not_a_github_repo():
+@pytest.mark.parametrize("context_data", [
+    "me/..", "me/.", "../x", "me", "me/x/y", "me/x; rm -rf ~", "", None,
+    ["me/x", "https://github.com/evil/y"], {"Title": "me/x"},
+])
+def test_context_menu_rejects_data_that_is_not_a_repo_name(context_data):
     built = handlers.build(Plugin(launcher=FlowLauncherV2()), lambda: FakeService())
-    assert built.context_menu(["me/x", "https://evil.example/me/x"]) == []
-    assert built.context_menu(["../x", "https://github.com/../x"]) == []
+    assert built.context_menu(context_data) == []
+
+
+def test_context_menu_urls_are_derived_from_the_name():
+    built = handlers.build(Plugin(launcher=FlowLauncherV2()), lambda: FakeService())
+    menu = built.context_menu("mona_acme/.github")
+    assert menu[0].json_rpc_action["Parameters"][0] == "https://github.com/mona_acme/.github"
+    assert menu[5].subtitle == "https://github.com/mona_acme/.github.git"
+    assert menu[6].subtitle == "git@github.com:mona_acme/.github.git"
 
 
 async def test_a_result_stays_small_on_the_wire(monkeypatch):
@@ -241,25 +253,30 @@ async def test_a_result_stays_small_on_the_wire(monkeypatch):
     assert len(wire) < 1024
 
 
-async def test_listing_is_capped_to_the_result_limit(monkeypatch):
+async def test_every_repo_is_listed_however_long_the_list(monkeypatch):
     service = FakeService()
     service.own = [Repo(f"me/repo-{i}", "", f"https://github.com/me/repo-{i}", "")
-                   for i in range(handlers.MAX_RESULTS + 20)]
+                   for i in range(450)]
     built = build(service, monkeypatch)
 
     listed = await titles(built, "/")
     filtered = await titles(built, "/repo")
 
-    assert len(listed) == handlers.MAX_RESULTS
-    assert listed[0] == "me/repo-0"
-    assert len(filtered) == handlers.MAX_RESULTS
+    assert listed == [repo.full_name for repo in service.own]
+    assert len(filtered) == 450
 
 
-def test_top_matches_keeps_api_order_on_ties_and_skips_non_matches():
-    repos = [OTHER, FLOW, STAR]
-    names = [repo.full_name for repo, _, _ in handlers.top_matches("flow", repos)]
-    assert "me/other" not in names
-    assert set(names) == {"me/flow-thing", "them/starred-flow"}
+def test_matches_keep_api_order_on_ties_and_skip_non_matches():
+    tied = [Repo(f"me/flow-{name}", "", "", "") for name in ("b", "a", "c")]
+    found = handlers.matches("flow", [OTHER, *tied])
+    assert [repo.full_name for repo, _, _ in found] == ["me/flow-b", "me/flow-a", "me/flow-c"]
+    assert len({score for _, score, _ in found}) == 1
+
+
+async def test_repeated_spaces_in_a_filter_do_not_break_matching(monkeypatch):
+    built = build(FakeService(), monkeypatch)
+    assert await titles(built, "/flow  thing") == ["me/flow-thing"]
+    assert (await titles(built, "fl  th"))[0] == "me/flow-thing"
 
 
 async def test_short_global_queries_never_leave_the_machine(monkeypatch):

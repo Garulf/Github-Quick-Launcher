@@ -44,7 +44,9 @@ Route = Union[Own, Stars, UserSearch, Global, Refresh, Clear]
 
 
 def route(text: str) -> Route:
-    text = text.strip()
+    # Collapsing runs of whitespace is not cosmetic: pyflowlauncher's fuzzy
+    # matcher raises IndexError on the empty word between two spaces.
+    text = " ".join(text.split())
     if text.lower() == REFRESH_COMMAND:
         return Refresh()
     if text.lower() == CLEAR_COMMAND:

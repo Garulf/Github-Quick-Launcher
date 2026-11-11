@@ -8,7 +8,6 @@ from typing import Any, AsyncIterator, Awaitable, Callable, List, Optional, Sequ
 from urllib.parse import quote_plus
 
 from pyflowlauncher import Plugin, Result
-from pyflowlauncher.plugin import _default_context_menu
 from pyflowlauncher.string_matcher import DEFAULT_QUERY_SEARCH_PRECISION, string_matcher
 
 from github_quick_launcher import avatar
@@ -29,11 +28,11 @@ MIN_SEARCH_CHARS = 3
 MISS_WAIT_SECONDS = 3.0
 PROMPT_SCORE = 1000
 OWN_MATCH_BOOST = 1000
-# Flow shows only the top handful of results, so sending every repository on
-# every keystroke only costs serialization time on both sides of the pipe.
-MAX_RESULTS = 30
 GITHUB_WEB = "https://github.com/"
-FULL_NAME_RE = re.compile(r"^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$")
+# "_" is not valid in an ordinary login but Enterprise Managed User logins
+# have one (mona_acme). "." and ".." are the only names made of valid
+# characters that GitHub refuses, and both would walk up a URL path.
+FULL_NAME_RE = re.compile(r"[A-Za-z0-9_-]+/(?!\.{1,2}$)[A-Za-z0-9._-]+")
 
 
 @dataclass
@@ -41,21 +40,22 @@ class Handlers:
     query: Callable[[str], AsyncIterator[Result]]
     refresh_cache: Callable[[], Awaitable[Any]]
     error_result: Callable[[GitHubError], Result]
-    context_menu: Callable[[Any], Optional[List[Result]]]
+    context_menu: Callable[[Any], List[Result]]
     clear_cache: Callable[[], Any]
 
 
-def top_matches(
-    text: str, repos: Sequence[Repo], limit: int = MAX_RESULTS,
+def matches(
+    text: str, repos: Sequence[Repo],
 ) -> List[Tuple[Repo, int, Optional[List[int]]]]:
-    """Return at most ``limit`` (repo, score, highlight) tuples, best first.
+    """Return a (repo, score, highlight) tuple per matching repo, best first.
 
     Matching runs on plain strings so that Result objects are only built for
-    what is actually sent. With no text, the API order is kept.
+    what matched. With no text everything matches and the API order is kept.
+    Nothing is cut off: Flow's list scrolls, and Flow boosts the results a
+    user picks often, which it can only do for results it was sent.
     """
     if not text:
-        top = repos[:limit]
-        return [(repo, len(top) - position, None) for position, repo in enumerate(top)]
+        return [(repo, len(repos) - position, None) for position, repo in enumerate(repos)]
     # Every non-space query character must appear in the name for the fuzzy
     # matcher to succeed, so this cheap check skips most names outright.
     needle = set(text.lower()) - {" "}
@@ -69,7 +69,7 @@ def top_matches(
         if match.matched:
             scored.append((-match.score, position, repo, match.index_list))
     scored.sort(key=lambda item: (item[0], item[1]))
-    return [(repo, -negative, index_list) for negative, _, repo, index_list in scored[:limit]]
+    return [(repo, -negative, index_list) for negative, _, repo, index_list in scored]
 
 
 def _owner(repo: Repo) -> str:
@@ -95,23 +95,23 @@ def build(plugin: Plugin, service_for: Callable[[], RepoService]) -> Handlers:
     api = plugin.launcher.api
     icons = plugin.launcher.icons
 
-    def context_menu(repo: Repo) -> List[Result]:
-        https_clone = f"{repo.html_url}.git"
-        ssh_clone = f"git@github.com:{repo.full_name}.git"
-        cli_clone = f"gh repo clone {repo.full_name}"
-        desktop = f"x-github-client://openRepo/{quote_plus(repo.full_name)}"
-        vscode = f"vscode://vscode.git/clone?url={quote_plus(repo.html_url)}"
+    def context_menu(full_name: str, html_url: str) -> List[Result]:
+        https_clone = f"{html_url}.git"
+        ssh_clone = f"git@github.com:{full_name}.git"
+        cli_clone = f"gh repo clone {full_name}"
+        desktop = f"x-github-client://openRepo/{quote_plus(full_name)}"
+        vscode = f"vscode://vscode.git/clone?url={quote_plus(html_url)}"
         return [
             Result("Open in browser", "Open repository in browser",
-                   icons.browser).add_action(api.open_url(repo.html_url)),
+                   icons.browser).add_action(api.open_url(html_url)),
             Result("Open with GitHub Desktop", "Open repository in GitHub Desktop",
                    icons.open).add_action(api.open_url(desktop)),
             Result("Open in VS Code", "Open repository in VS Code",
                    icons.open).add_action(api.open_url(vscode)),
-            Result("Copy full name", repo.full_name,
-                   icons.copy).add_action(api.copy_to_clipboard(repo.full_name)),
-            Result("Copy URL", repo.html_url,
-                   icons.copy).add_action(api.copy_to_clipboard(repo.html_url)),
+            Result("Copy full name", full_name,
+                   icons.copy).add_action(api.copy_to_clipboard(full_name)),
+            Result("Copy URL", html_url,
+                   icons.copy).add_action(api.copy_to_clipboard(html_url)),
             Result("Clone with HTTPS", https_clone,
                    icons.copy).add_action(api.copy_to_clipboard(https_clone)),
             Result("Clone with SSH", ssh_clone,
@@ -120,15 +120,13 @@ def build(plugin: Plugin, service_for: Callable[[], RepoService]) -> Handlers:
                    icons.copy).add_action(api.copy_to_clipboard(cli_clone)),
         ]
 
-    def context_menu_handler(context_data: Any) -> Optional[List[Result]]:
-        # Results carry only [full_name, html_url]; the menu is built when the
-        # user actually opens it instead of being serialized with every result.
-        if (isinstance(context_data, list) and len(context_data) == 2
-                and all(isinstance(item, str) for item in context_data)):
-            full_name, html_url = context_data
-            if FULL_NAME_RE.fullmatch(full_name) and html_url.startswith(GITHUB_WEB):
-                return context_menu(Repo(full_name, "", html_url, ""))
-        return _default_context_menu(context_data)
+    def context_menu_handler(context_data: Any) -> List[Result]:
+        # Results carry only the full name; the menu is built when the user
+        # opens it instead of being serialized with every result. The URL is
+        # derived here so the two can never disagree.
+        if isinstance(context_data, str) and FULL_NAME_RE.fullmatch(context_data):
+            return context_menu(context_data, GITHUB_WEB + context_data)
+        return []
 
     def icon_for(repo: Repo, show_avatars: bool) -> str:
         if not show_avatars or not repo.avatar_url:
@@ -144,7 +142,7 @@ def build(plugin: Plugin, service_for: Callable[[], RepoService]) -> Handlers:
             icon=icon_for(repo, show_avatars),
             score=score,
             copy_text=repo.full_name,
-            context_data=[repo.full_name, repo.html_url],
+            context_data=repo.full_name,
             rounded_icon=True,
             title_highlight_data=highlight,
         ).add_action(api.open_url(repo.html_url))
@@ -153,7 +151,7 @@ def build(plugin: Plugin, service_for: Callable[[], RepoService]) -> Handlers:
         text: str, repos: Sequence[Repo], show_avatars: bool, boost: int = 0,
     ) -> List[Result]:
         return [repo_result(repo, boost + score, highlight, show_avatars)
-                for repo, score, highlight in top_matches(text, repos)]
+                for repo, score, highlight in matches(text, repos)]
 
     def settings_prompt() -> Result:
         return Result(

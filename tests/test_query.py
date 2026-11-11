@@ -17,6 +17,8 @@ from github_quick_launcher.query import Clear, Global, Own, Refresh, Stars, User
     ("garulf/flow", UserSearch("garulf", "flow")),
     ("garulf/flow/extra", UserSearch("garulf", "flow/extra")),
     ("flow launcher", Global("flow launcher")),
+    ("flow   launcher", Global("flow launcher")),
+    ("/a  b", Own("a b")),
     ("!refresh", Refresh()),
     ("!REFRESH ", Refresh()),
     ("!clear", Clear()),
