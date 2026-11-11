@@ -11,12 +11,14 @@ PER_PAGE = 100
 MAX_PAGES = 10
 SEARCH_LIMIT = 15
 TIMEOUT_SECONDS = 10.0
-# A listing's ETag is stored as one ETag per page, joined by a newline
-# (which never appears inside an ETag) behind a version prefix. A snapshot
-# from an older release holds only page 1's ETag and has no prefix, so it is
-# refetched once instead of being trusted.
+# A listing's ETag is stored as one ETag per page behind a version prefix.
+# A snapshot from an older release holds only page 1's ETag and has no
+# prefix, so it is refetched once instead of being trusted. The separator
+# must be legal in a header value: a release from before the prefix sends
+# the stored string as If-None-Match unchanged, and GitHub answers a value
+# it does not recognise with a plain 200. A space never appears in an ETag.
 ETAG_PREFIX = "pages:"
-ETAG_SEPARATOR = "\n"
+ETAG_SEPARATOR = " "
 
 _now = time.time
 
@@ -134,6 +136,9 @@ class GitHubClient:
         repository added, starred or removed beyond the first 100 leaves
         page 1 untouched, so each later page is revalidated too. Any change
         refetches the whole list, since items shift across page boundaries.
+
+        Only a request with a token gets its 304s free of charge. Without
+        one every page checked counts against the 60 requests an hour.
         """
         known = _split_etags(etag)
         params = {"per_page": PER_PAGE, "sort": "updated"}
@@ -142,7 +147,7 @@ class GitHubClient:
             if await self._pages_unchanged(path, params, known[1:]):
                 return Listing(None, etag)
             response = await self._get(path, params)
-        return await self._read_pages(response)
+        return await self._read_pages(path, params, response)
 
     async def _pages_unchanged(
         self, path: str, params: Mapping[str, Any], etags: List[str],
@@ -153,17 +158,29 @@ class GitHubClient:
                 return False
         return True
 
-    async def _read_pages(self, response: httpx.Response) -> Listing:
-        etags = [response.headers.get("ETag")]
-        repos = [Repo.from_api(item) for item in response.json()]
-        while "next" in response.links and len(etags) < MAX_PAGES:
-            response = await self._get(response.links["next"]["url"])
-            repos.extend(Repo.from_api(item) for item in response.json())
+    async def _read_pages(
+        self, path: str, params: Mapping[str, Any], response: httpx.Response,
+    ) -> Listing:
+        etags: List[Optional[str]] = []
+        repos: List[Repo] = []
+        while True:
+            items = response.json()
+            repos.extend(Repo.from_api(item) for item in items)
             etags.append(response.headers.get("ETag"))
-        complete = [tag for tag in etags if tag and ETAG_SEPARATOR not in tag]
-        combined = (ETAG_PREFIX + ETAG_SEPARATOR.join(complete)
-                    if len(complete) == len(etags) else None)
-        return Listing(repos, combined)
+            if len(etags) >= MAX_PAGES:
+                break
+            if "next" in response.links:
+                response = await self._get(response.links["next"]["url"])
+            elif len(items) == PER_PAGE:
+                # The list ends on a full page, so the next item added at
+                # the end starts a new page and changes none of these. Keep
+                # the ETag of that still empty page so the growth is seen.
+                response = await self._get(path, {**params, "page": len(etags) + 1})
+            else:
+                break
+        if not all(tag and ETAG_SEPARATOR not in tag for tag in etags):
+            return Listing(repos, None)
+        return Listing(repos, ETAG_PREFIX + ETAG_SEPARATOR.join(tag for tag in etags if tag))
 
     async def search(self, q: str, limit: int = SEARCH_LIMIT) -> List[Repo]:
         response = await self._get("/search/repositories", {"q": q, "per_page": limit})
