@@ -4,11 +4,13 @@ import logging
 import re
 from typing import Iterable, Optional, Set
 
-# Classic and fine-grained GitHub tokens, Authorization headers, and a
+# Classic and fine-grained GitHub tokens, Authorization headers (including
+# the "token <40 hex>" form of tokens older than the prefixes), and a
 # "token" key inside a logged settings dictionary or JSON-RPC line.
 _PATTERNS = (
-    re.compile(r"\b(?:gh[opusr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})"),
+    re.compile(r"(?<![A-Za-z0-9])(?:gh[opusr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})"),
     re.compile(r"(?i)(bearer\s+)[^\s'\",]+"),
+    re.compile(r"(?i)(\btoken\s+)[0-9a-f]{40}\b"),
     re.compile(r"""(?i)(['"]token['"]\s*:\s*['"])[^'"]*"""),
 )
 MASK = "***"
@@ -36,12 +38,16 @@ class RedactingFilter(logging.Filter):
         try:
             message = record.getMessage()
         except Exception:
-            return True
+            # Arguments that do not fit the format: left alone, logging's
+            # own error handler would print them to stderr unmasked.
+            message = f"{record.msg} {record.args!r}"
         record.msg, record.args = scrub(message), None
         if record.exc_info and not record.exc_text:
             record.exc_text = logging.Formatter().formatException(record.exc_info)
         if record.exc_text:
             record.exc_text = scrub(record.exc_text)
+        if record.stack_info:
+            record.stack_info = scrub(record.stack_info)
         return True
 
 

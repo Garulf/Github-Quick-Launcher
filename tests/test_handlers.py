@@ -296,6 +296,15 @@ async def test_online_search_off_keeps_global_queries_local(monkeypatch):
 
     assert await titles(built, "flow") == ["me/flow-thing"]
     assert await titles(built, "garulf/flow") == ["Online search is off"]
+    assert await titles(built, "nothing-local") == ["Online search is off"]
+    assert service.searched == []
+
+
+async def test_a_short_query_with_no_local_match_says_why_nothing_is_listed(monkeypatch):
+    service = FakeService()
+    built = build(service, monkeypatch)
+
+    assert await titles(built, "zz") == ["Keep typing to search GitHub"]
     assert service.searched == []
 
 

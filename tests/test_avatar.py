@@ -21,6 +21,8 @@ def test_sized_leaves_other_hosts_alone():
     assert avatar.sized("http://avatars.githubusercontent.com/u/1", 64) == (
         "http://avatars.githubusercontent.com/u/1")
     assert avatar.sized("https://example.com/a.png", 64) == "https://example.com/a.png"
+    lookalike = "https://evilgithubusercontent.com/u/1"
+    assert avatar.sized(lookalike, 64) == lookalike
 
 
 def test_system_dpi_is_a_positive_number():

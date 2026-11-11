@@ -214,6 +214,13 @@ def build(plugin: Plugin, service_for: Callable[[], RepoService]) -> Handlers:
             PLUGIN_ICON,
         ).add_action(api.open_setting_dialog())
 
+    def keep_typing() -> Result:
+        return Result(
+            "Keep typing to search GitHub",
+            f"None of your repositories match. Search starts at {MIN_SEARCH_CHARS} characters",
+            PLUGIN_ICON,
+        )
+
     async def query(text: str) -> AsyncIterator[Result]:
         service = service_for()
         settings = service.settings
@@ -269,8 +276,12 @@ def build(plugin: Plugin, service_for: Callable[[], RepoService]) -> Handlers:
         for result in own_matches:
             yield result
         if not settings.online_search:
+            if not own_matches:
+                yield online_search_disabled()
             return
         if len(parsed.text.replace(" ", "")) < MIN_SEARCH_CHARS:
+            if not own_matches:
+                yield keep_typing()
             return
         try:
             found = await debounced_search(service, parsed.text)

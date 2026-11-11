@@ -7,7 +7,7 @@ import os
 import time
 from dataclasses import asdict
 from pathlib import Path
-from typing import Awaitable, Callable, Iterable, List, Optional
+from typing import Awaitable, Callable, Iterable, List, Optional, Set
 
 from github_quick_launcher.client import GitHubError, Listing, RateLimited, Repo
 
@@ -23,6 +23,10 @@ CACHE_SUFFIXES = (".json", ".tmp")
 # pyflowlauncher attaches the plugin.log handler to its own logger, so logging
 # under a child of it is what reaches the log Flow Launcher ships to users.
 _LOGGER = logging.getLogger(f"pyflowlauncher.{__name__}")
+
+# The loop only holds weak references to tasks, and clear() lets go of a
+# refresh that is still running.
+_abandoned: Set["asyncio.Task[None]"] = set()
 
 
 class RepoStore:
@@ -42,6 +46,7 @@ class RepoStore:
         self.last_error: Optional[GitHubError] = None
         self._persist = True
         self._revalidated_at: Optional[float] = None
+        self._generation = 0
         self._load()
 
     @property
@@ -84,7 +89,13 @@ class RepoStore:
         return list(self._repos)
 
     async def refresh(self) -> None:
+        generation = self._generation
         listing = await self._fetch(self._etag)
+        if generation != self._generation:
+            # clear() ran while GitHub was answering. The answer belongs to
+            # the list that was just deleted: "not modified" would now mean
+            # an empty list, and saving would bring the file back.
+            return
         if listing.repos is not None:
             self._repos = listing.repos
             self._etag = listing.etag
@@ -142,8 +153,14 @@ class RepoStore:
         self._persist = False
 
     def clear(self) -> None:
+        self._generation += 1
+        if self._refresh_task is not None and not self._refresh_task.done():
+            _abandoned.add(self._refresh_task)
+            self._refresh_task.add_done_callback(_abandoned.discard)
+        self._refresh_task = None
         self._repos, self._etag, self._fetched_at = [], None, None
         self._failed_at = None
+        self._revalidated_at = None
         self.last_error = None
         _remove(self._path)
         _remove(self._path.with_suffix(".tmp"))
@@ -157,17 +174,20 @@ class RepoStore:
             _LOGGER.warning("No running loop to refresh the repo cache")
 
     async def _refresh_recording_errors(self) -> None:
+        generation = self._generation
         try:
             await self.refresh()
         except GitHubError as exc:
-            self._record_failure(exc)
+            self._record_failure(exc, generation)
         except Exception as exc:
             _LOGGER.exception("Unexpected error refreshing repo cache")
             error = GitHubError(f"Refresh failed: {exc}")
             error.__cause__ = exc
-            self._record_failure(error)
+            self._record_failure(error, generation)
 
-    def _record_failure(self, error: GitHubError) -> None:
+    def _record_failure(self, error: GitHubError, generation: int) -> None:
+        if generation != self._generation:
+            return
         self.last_error = error
         self._failed_at = self._clock()
 

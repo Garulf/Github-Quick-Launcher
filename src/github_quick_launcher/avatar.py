@@ -45,7 +45,8 @@ def size_for_dpi(dpi: int) -> int:
 def sized(url: str, size: int) -> str:
     """Ask GitHub's avatar CDN for a ``size`` px image instead of the original."""
     parts = urlsplit(url)
-    if parts.scheme != "https" or not parts.netloc.endswith("githubusercontent.com"):
+    host = parts.hostname or ""
+    if parts.scheme != "https" or not host.endswith(".githubusercontent.com"):
         return url
     query = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True) if k != "s"]
     query.append(("s", str(size)))

@@ -44,3 +44,21 @@ def test_filter_masks_records_from_child_loggers(tmp_path):
     assert CLASSIC not in written
     assert "Bad JSON-RPC line" in written
     assert "ValueError: boom ***" in written
+
+
+def test_scrub_masks_tokens_glued_to_other_text_and_legacy_headers():
+    assert CLASSIC not in redact.scrub(f"key_{CLASSIC}")
+    legacy = "0123456789abcdef" * 2 + "01234567"
+    assert legacy not in redact.scrub(f"Authorization: token {legacy}")
+
+
+def test_a_record_whose_arguments_do_not_fit_is_still_masked():
+    record = logging.LogRecord(
+        "any", logging.WARNING, __file__, 1, "%s and %s", (CLASSIC,), None)
+    record.stack_info = f"Stack with {CLASSIC}"
+
+    assert redact.RedactingFilter().filter(record) is True
+
+    assert CLASSIC not in record.getMessage()
+    assert "***" in record.getMessage()
+    assert CLASSIC not in record.stack_info

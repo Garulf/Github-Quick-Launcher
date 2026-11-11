@@ -331,3 +331,42 @@ async def test_revalidate_reports_a_failed_refresh(tmp_path):
 async def test_nudge_needs_a_snapshot_to_revalidate(tmp_path):
     store = RepoStore(tmp_path / "repos.json", 6 * 3600, FakeFetch(), FakeClock())
     assert store.nudge() is False
+
+
+async def test_clear_is_not_undone_by_a_refresh_already_in_flight(tmp_path):
+    clock = FakeClock()
+    fetch = FakeFetch(Listing([ONE], '"v1"'), Listing(None, '"v1"'), Listing([TWO], '"v2"'))
+    store = RepoStore(tmp_path / "repos.json", 600, fetch, clock)
+    await store.repos()
+    clock.now += 601
+    fetch.gate.clear()
+    store.snapshot()  # the stale list starts a refresh that sends the old ETag
+    await asyncio.sleep(0)
+
+    store.clear()
+    fetch.gate.set()
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+
+    assert not (tmp_path / "repos.json").exists()
+    assert store.has_snapshot is False
+    assert await store.repos() == [TWO]
+    assert fetch.etags == [None, '"v1"', None]
+
+
+async def test_clear_drops_the_failure_of_a_refresh_already_in_flight(tmp_path):
+    clock = FakeClock()
+    fetch = FakeFetch(Listing([ONE], '"v1"'), Offline("down"))
+    store = RepoStore(tmp_path / "repos.json", 600, fetch, clock)
+    await store.repos()
+    clock.now += 601
+    fetch.gate.clear()
+    store.snapshot()
+    await asyncio.sleep(0)
+
+    store.clear()
+    fetch.gate.set()
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+
+    assert store.last_error is None
