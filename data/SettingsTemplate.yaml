@@ -17,9 +17,9 @@ body:
     attributes:
       name: cache_ttl_minutes
       label: "Cache lifetime (minutes):"
-      defaultValue: "10"
+      defaultValue: "360"
       description: >
-        How long your repository list is reused before it is refreshed in the background.
+        How long your repository and star lists are reused before they are refreshed in the background. A filter that matches nothing, or a search that finds one of your repositories missing from the list, refreshes it early (at most once a minute).
   - type: checkbox
     attributes:
       name: online_search

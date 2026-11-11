@@ -5,7 +5,10 @@ import re
 from dataclasses import dataclass
 from typing import Any, Mapping, Optional
 
-DEFAULT_TTL_MINUTES = 10
+# Long on purpose: a repository list's ETag changes whenever any listed
+# repository is pushed to, so a short TTL mostly refetches unchanged names.
+# Misses trigger an early revalidation instead (see RepoStore.nudge).
+DEFAULT_TTL_MINUTES = 360
 LOGIN_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$")
 
 
