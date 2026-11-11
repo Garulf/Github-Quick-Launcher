@@ -102,3 +102,9 @@ async def test_non_identity_setting_change_keeps_the_snapshot(clean_main, tmp_pa
     assert len(list(cache_dir.iterdir())) == 2
     for task in clean_main._retiring:
         task.cancel()
+
+
+async def test_tests_never_resolve_the_real_appdata(clean_main, isolated_appdata):
+    _set_settings(clean_main, {"username": "octocat"})
+    service = clean_main._service_for_current_settings()
+    assert all(str(path).startswith(str(isolated_appdata)) for path in service.cache_files())
