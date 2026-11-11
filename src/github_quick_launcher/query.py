@@ -6,6 +6,7 @@ from typing import Union
 STARS_PREFIX = "*"
 SEPARATOR = "/"
 REFRESH_COMMAND = "!refresh"
+CLEAR_COMMAND = "!clear"
 
 
 @dataclass(frozen=True)
@@ -34,13 +35,22 @@ class Refresh:
     pass
 
 
-Route = Union[Own, Stars, UserSearch, Global, Refresh]
+@dataclass(frozen=True)
+class Clear:
+    pass
+
+
+Route = Union[Own, Stars, UserSearch, Global, Refresh, Clear]
 
 
 def route(text: str) -> Route:
-    text = text.strip()
+    # Collapsing runs of whitespace is not cosmetic: pyflowlauncher's fuzzy
+    # matcher raises IndexError on the empty word between two spaces.
+    text = " ".join(text.split())
     if text.lower() == REFRESH_COMMAND:
         return Refresh()
+    if text.lower() == CLEAR_COMMAND:
+        return Clear()
     if text.startswith(STARS_PREFIX):
         return Stars(text[len(STARS_PREFIX):].strip())
     if SEPARATOR not in text:

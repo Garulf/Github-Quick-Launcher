@@ -17,6 +17,20 @@ body:
     attributes:
       name: cache_ttl_minutes
       label: "Cache lifetime (minutes):"
-      defaultValue: "10"
+      defaultValue: "360"
       description: >
-        How long your repository list is reused before it is refreshed in the background.
+        How long your repository and star lists are reused before they are refreshed in the background. A filter that matches nothing, or a search that finds one of your repositories missing from the list, refreshes it early (at most once a minute, or once every ten minutes without a token).
+  - type: checkbox
+    attributes:
+      name: online_search
+      label: "Search all of GitHub as you type"
+      defaultValue: "true"
+      description: >
+        When on, a query of three or more characters is also sent to GitHub's search API. Turn off to search only your cached repositories; nothing you type is sent to GitHub.
+  - type: checkbox
+    attributes:
+      name: show_avatars
+      label: "Show owner avatars"
+      defaultValue: "true"
+      description: >
+        Loads a small owner avatar from GitHub for each result. Turn off to use the plugin icon and load no images.

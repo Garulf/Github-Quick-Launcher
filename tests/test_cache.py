@@ -283,3 +283,166 @@ async def test_cold_unexpected_failure_raises_github_error(tmp_path):
     with pytest.raises(GitHubError) as exc_info:
         await store.repos()
     assert not isinstance(exc_info.value, ValueError)
+
+
+async def test_revalidate_refreshes_a_fresh_snapshot_once_per_cooldown(tmp_path):
+    clock = FakeClock()
+    fetch = FakeFetch(Listing([ONE], '"v1"'), Listing([ONE, TWO], '"v2"'), Listing([TWO], '"v3"'))
+    store = RepoStore(tmp_path / "repos.json", 6 * 3600, fetch, clock)
+    await store.repos()
+
+    clock.now += 30
+    assert await store.revalidate(3) is False  # just fetched
+    clock.now += 60
+    assert await store.revalidate(3) is True
+    assert await store.repos() == [ONE, TWO]
+    clock.now += 10
+    assert await store.revalidate(3) is False  # cooling down
+    assert fetch.etags == [None, '"v1"']
+
+
+async def test_revalidate_gives_up_waiting_but_the_refresh_still_lands(tmp_path):
+    clock = FakeClock()
+    fetch = FakeFetch(Listing([ONE], '"v1"'), Listing([TWO], '"v2"'))
+    store = RepoStore(tmp_path / "repos.json", 6 * 3600, fetch, clock)
+    await store.repos()
+    clock.now += 120
+    fetch.gate.clear()
+
+    assert await store.revalidate(0.01) is False
+
+    fetch.gate.set()
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    assert await store.repos() == [TWO]
+
+
+async def test_revalidate_reports_a_failed_refresh(tmp_path):
+    clock = FakeClock()
+    fetch = FakeFetch(Listing([ONE], '"v1"'), Offline("down"))
+    store = RepoStore(tmp_path / "repos.json", 6 * 3600, fetch, clock)
+    await store.repos()
+    clock.now += 120
+
+    assert await store.revalidate(3) is False
+    assert await store.repos() == [ONE]
+
+
+async def test_nudge_needs_a_snapshot_to_revalidate(tmp_path):
+    store = RepoStore(tmp_path / "repos.json", 6 * 3600, FakeFetch(), FakeClock())
+    assert store.nudge() is False
+
+
+async def test_clear_is_not_undone_by_a_refresh_already_in_flight(tmp_path):
+    clock = FakeClock()
+    fetch = FakeFetch(Listing([ONE], '"v1"'), Listing(None, '"v1"'), Listing([TWO], '"v2"'))
+    store = RepoStore(tmp_path / "repos.json", 600, fetch, clock)
+    await store.repos()
+    clock.now += 601
+    fetch.gate.clear()
+    store.snapshot()  # the stale list starts a refresh that sends the old ETag
+    await asyncio.sleep(0)
+
+    store.clear()
+    fetch.gate.set()
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+
+    assert not (tmp_path / "repos.json").exists()
+    assert store.has_snapshot is False
+    assert await store.repos() == [TWO]
+    assert fetch.etags == [None, '"v1"', None]
+
+
+async def test_clear_drops_the_failure_of_a_refresh_already_in_flight(tmp_path):
+    clock = FakeClock()
+    fetch = FakeFetch(Listing([ONE], '"v1"'), Offline("down"))
+    store = RepoStore(tmp_path / "repos.json", 600, fetch, clock)
+    await store.repos()
+    clock.now += 601
+    fetch.gate.clear()
+    store.snapshot()
+    await asyncio.sleep(0)
+
+    store.clear()
+    fetch.gate.set()
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+
+    assert store.last_error is None
+
+
+async def test_a_later_miss_waits_for_the_revalidation_an_earlier_one_started(tmp_path):
+    clock = FakeClock()
+    fetch = FakeFetch(Listing([ONE], '"v1"'), Listing([ONE, TWO], '"v2"'))
+    store = RepoStore(tmp_path / "repos.json", 6 * 3600, fetch, clock)
+    await store.repos()
+    clock.now += 120
+    fetch.gate.clear()
+    first = asyncio.ensure_future(store.revalidate(3))
+    await asyncio.sleep(0)
+    first.cancel()  # the host supersedes the query that started the refresh
+
+    second = asyncio.ensure_future(store.revalidate(3))
+    await asyncio.sleep(0)
+    assert not second.done()
+    fetch.gate.set()
+
+    assert await second is True
+    assert await store.repos() == [ONE, TWO]
+    assert fetch.etags == [None, '"v1"']
+
+
+async def test_revalidate_without_anything_to_wait_for_answers_at_once(tmp_path):
+    clock = FakeClock()
+    fetch = FakeFetch(Listing([ONE], '"v1"'))
+    store = RepoStore(tmp_path / "repos.json", 6 * 3600, fetch, clock)
+    await store.repos()
+
+    assert await store.revalidate(3) is False
+    assert fetch.etags == [None]
+
+
+async def test_a_failed_early_revalidation_is_not_reported_for_the_rest_of_the_lifetime(tmp_path):
+    clock = FakeClock()
+    fetch = FakeFetch(Listing([ONE], '"v1"'), Offline("down"))
+    store = RepoStore(tmp_path / "repos.json", 6 * 3600, fetch, clock)
+    await store.repos()
+    clock.now += 120
+    assert await store.revalidate(3) is False
+
+    assert await store.repos() == [ONE]
+    assert isinstance(store.last_error, Offline)  # still said while it is news
+
+    clock.now += 61
+    assert await store.repos() == [ONE]
+    assert store.last_error is None
+    assert store.snapshot() == [ONE]
+    assert fetch.etags == [None, '"v1"']  # fresh, so nothing is retried either
+
+
+async def test_the_failure_of_a_stale_list_keeps_being_reported(tmp_path):
+    clock = FakeClock()
+    fetch = FakeFetch(Listing([ONE], '"v1"'), Offline("down"), Offline("down"))
+    store = RepoStore(tmp_path / "repos.json", 600, fetch, clock)
+    await store.repos()
+    clock.now += 601
+    store.snapshot()
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+
+    clock.now += 61
+    assert store.snapshot() == [ONE]
+    assert isinstance(store.last_error, Offline)
+
+
+async def test_the_miss_cooldown_can_be_longer(tmp_path):
+    clock = FakeClock()
+    fetch = FakeFetch(Listing([ONE], '"v1"'), Listing([TWO], '"v2"'))
+    store = RepoStore(tmp_path / "repos.json", 6 * 3600, fetch, clock, miss_cooldown=600)
+    await store.repos()
+
+    clock.now += 599
+    assert store.nudge() is False
+    clock.now += 2
+    assert store.nudge() is True
