@@ -34,6 +34,9 @@ class FakeService:
         self.searched: List[str] = []
         self.refreshed = False
         self.refresh_error = None
+        self.revalidated: List[str] = []
+        self.after_revalidate: Optional[List[Repo]] = None
+        self.nudged = 0
 
     def own_snapshot(self):
         return self.own if self.in_memory is None else self.in_memory
@@ -52,6 +55,23 @@ class FakeService:
         if self.search_error is not None:
             raise self.search_error
         return self.search_results
+
+    async def revalidate_own(self, wait):
+        self.revalidated.append("own")
+        if self.after_revalidate is None:
+            return False
+        self.own = self.after_revalidate
+        return True
+
+    async def revalidate_stars(self, wait):
+        self.revalidated.append("stars")
+        if self.after_revalidate is None:
+            return False
+        self.stars = self.after_revalidate
+        return True
+
+    def nudge_own(self):
+        self.nudged += 1
 
     def clear_cache(self):
         self.cleared = True
@@ -286,3 +306,54 @@ async def test_clear_command_deletes_cached_lists(monkeypatch):
     command = built.clear_cache()
     assert service.cleared is True
     assert command["Method"].endswith("ShowMsg")
+
+
+NEW = Repo("me/brand-new", "", "https://github.com/me/brand-new", "")
+
+
+async def test_a_filter_that_matches_nothing_revalidates_and_looks_again(monkeypatch):
+    service = FakeService()
+    service.after_revalidate = [NEW, FLOW, OTHER]
+    built = build(service, monkeypatch)
+
+    assert await titles(built, "/brand") == ["me/brand-new"]
+    assert service.revalidated == ["own"]
+
+
+async def test_a_star_miss_revalidates_the_star_list(monkeypatch):
+    service = FakeService()
+    service.after_revalidate = [NEW]
+    built = build(service, monkeypatch)
+
+    assert await titles(built, "*brand") == ["me/brand-new"]
+    assert service.revalidated == ["stars"]
+
+
+async def test_matches_and_bare_listings_never_revalidate(monkeypatch):
+    service = FakeService()
+    built = build(service, monkeypatch)
+
+    await titles(built, "/flow")
+    await titles(built, "/")
+    await titles(built, "*")
+
+    assert service.revalidated == []
+
+
+async def test_a_search_hit_missing_from_own_repos_nudges_a_refresh(monkeypatch):
+    service = FakeService()
+    service.search_results = [Repo("me/flow-new", "", "https://github.com/me/flow-new", "")]
+    await titles(build(service, monkeypatch), "flow")
+    assert service.nudged == 1
+
+
+async def test_search_hits_of_other_owners_do_not_nudge(monkeypatch):
+    service = FakeService()
+    await titles(build(service, monkeypatch), "flow")  # finds org/flow-remote
+    assert service.nudged == 0
+
+
+def test_missing_from_own_uses_the_username_when_the_list_is_empty():
+    found = [Repo("Garulf/new", "", "https://github.com/Garulf/new", "")]
+    assert handlers._missing_from_own(found, [], "garulf") is True
+    assert handlers._missing_from_own(found, [], "") is False

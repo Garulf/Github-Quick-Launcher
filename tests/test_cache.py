@@ -283,3 +283,51 @@ async def test_cold_unexpected_failure_raises_github_error(tmp_path):
     with pytest.raises(GitHubError) as exc_info:
         await store.repos()
     assert not isinstance(exc_info.value, ValueError)
+
+
+async def test_revalidate_refreshes_a_fresh_snapshot_once_per_cooldown(tmp_path):
+    clock = FakeClock()
+    fetch = FakeFetch(Listing([ONE], '"v1"'), Listing([ONE, TWO], '"v2"'), Listing([TWO], '"v3"'))
+    store = RepoStore(tmp_path / "repos.json", 6 * 3600, fetch, clock)
+    await store.repos()
+
+    clock.now += 30
+    assert await store.revalidate(3) is False  # just fetched
+    clock.now += 60
+    assert await store.revalidate(3) is True
+    assert await store.repos() == [ONE, TWO]
+    clock.now += 10
+    assert await store.revalidate(3) is False  # cooling down
+    assert fetch.etags == [None, '"v1"']
+
+
+async def test_revalidate_gives_up_waiting_but_the_refresh_still_lands(tmp_path):
+    clock = FakeClock()
+    fetch = FakeFetch(Listing([ONE], '"v1"'), Listing([TWO], '"v2"'))
+    store = RepoStore(tmp_path / "repos.json", 6 * 3600, fetch, clock)
+    await store.repos()
+    clock.now += 120
+    fetch.gate.clear()
+
+    assert await store.revalidate(0.01) is False
+
+    fetch.gate.set()
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    assert await store.repos() == [TWO]
+
+
+async def test_revalidate_reports_a_failed_refresh(tmp_path):
+    clock = FakeClock()
+    fetch = FakeFetch(Listing([ONE], '"v1"'), Offline("down"))
+    store = RepoStore(tmp_path / "repos.json", 6 * 3600, fetch, clock)
+    await store.repos()
+    clock.now += 120
+
+    assert await store.revalidate(3) is False
+    assert await store.repos() == [ONE]
+
+
+async def test_nudge_needs_a_snapshot_to_revalidate(tmp_path):
+    store = RepoStore(tmp_path / "repos.json", 6 * 3600, FakeFetch(), FakeClock())
+    assert store.nudge() is False

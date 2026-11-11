@@ -14,6 +14,10 @@ from github_quick_launcher.client import GitHubError, Listing, RateLimited, Repo
 Fetch = Callable[[Optional[str]], Awaitable[Listing]]
 
 MAX_COOLDOWN_SECONDS = 60.0
+# A revalidation asked for by a miss (a filter matching nothing, a search
+# hit that should have been cached) happens at most this often, so typing
+# gibberish cannot turn every keystroke into a request.
+MISS_COOLDOWN_SECONDS = 60.0
 CACHE_SUFFIXES = (".json", ".tmp")
 
 # pyflowlauncher attaches the plugin.log handler to its own logger, so logging
@@ -37,6 +41,7 @@ class RepoStore:
         self._failed_at: Optional[float] = None
         self.last_error: Optional[GitHubError] = None
         self._persist = True
+        self._revalidated_at: Optional[float] = None
         self._load()
 
     @property
@@ -87,6 +92,46 @@ class RepoStore:
         self._failed_at = None
         self.last_error = None
         self._save()
+
+    def _may_revalidate(self) -> bool:
+        if not self.has_snapshot or self._in_cooldown:
+            return False
+        now = self._clock()
+        for last in (self._revalidated_at, self._fetched_at):
+            if last is not None and now - last < MISS_COOLDOWN_SECONDS:
+                return False
+        return True
+
+    def nudge(self) -> bool:
+        """Revalidate in the background because the snapshot looks out of date.
+
+        The TTL is long because GitHub's ETags change on every push, but a
+        new repository or star should not wait hours to show up. Misses are
+        the signal that it is worth asking GitHub early.
+        """
+        if not self._may_revalidate():
+            return False
+        self._revalidated_at = self._clock()
+        self._start_refresh()
+        return self._refresh_task is not None
+
+    async def revalidate(self, wait: float) -> bool:
+        """Revalidate now and wait up to ``wait`` seconds for the result.
+
+        Returns True only when a refresh finished successfully in time, so
+        the caller knows a second look at the snapshot is worthwhile.
+        """
+        if not self.nudge():
+            return False
+        task = self._refresh_task
+        assert task is not None
+        try:
+            # shield: a timeout or a superseded query must not cancel the
+            # refresh itself; it still lands for the next keystroke.
+            await asyncio.wait_for(asyncio.shield(task), wait)
+        except asyncio.TimeoutError:
+            return False
+        return self.last_error is None
 
     def stop_persisting(self) -> None:
         """Keep serving from memory but never write this store to disk again.

@@ -28,7 +28,7 @@ def test_empty_settings_have_no_identity():
     settings = Settings.from_raw({})
     assert settings.has_identity is False
     assert settings.identity_key is None
-    assert settings.ttl_seconds == 600
+    assert settings.ttl_seconds == 6 * 60 * 60
 
 
 def test_username_is_trimmed_and_at_sign_removed():
@@ -50,8 +50,8 @@ def test_none_values_from_flow_are_treated_as_blank():
 
 
 def test_invalid_ttl_falls_back_to_default():
-    assert Settings.from_raw({"cache_ttl_minutes": "abc"}).cache_ttl_minutes == 10
-    assert Settings.from_raw({"cache_ttl_minutes": "0"}).cache_ttl_minutes == 10
+    assert Settings.from_raw({"cache_ttl_minutes": "abc"}).cache_ttl_minutes == 360
+    assert Settings.from_raw({"cache_ttl_minutes": "0"}).cache_ttl_minutes == 360
     assert Settings.from_raw({"cache_ttl_minutes": "30"}).ttl_seconds == 1800
 
 

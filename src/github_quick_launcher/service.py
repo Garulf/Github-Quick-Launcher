@@ -67,6 +67,16 @@ class RepoService:
     async def starred(self) -> List[Repo]:
         return await self._stars.repos() if self._stars is not None else []
 
+    async def revalidate_own(self, wait: float) -> bool:
+        return await self._own.revalidate(wait) if self._own is not None else False
+
+    async def revalidate_stars(self, wait: float) -> bool:
+        return await self._stars.revalidate(wait) if self._stars is not None else False
+
+    def nudge_own(self) -> None:
+        if self._own is not None:
+            self._own.nudge()
+
     async def search(self, q: str) -> List[Repo]:
         memo = self._searches.get(q)
         if memo is not None and self._clock() - memo[0] < SEARCH_TTL_SECONDS:

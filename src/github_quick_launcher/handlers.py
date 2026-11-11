@@ -24,6 +24,9 @@ PLUGIN_ICON = "icon.png"
 # for enough characters to mean something before sending anything.
 DEBOUNCE_SECONDS = 0.4
 MIN_SEARCH_CHARS = 3
+# How long a filter that matched nothing waits for a fresh list before
+# answering with what it has.
+MISS_WAIT_SECONDS = 3.0
 PROMPT_SCORE = 1000
 OWN_MATCH_BOOST = 1000
 # Flow shows only the top handful of results, so sending every repository on
@@ -67,6 +70,25 @@ def top_matches(
             scored.append((-match.score, position, repo, match.index_list))
     scored.sort(key=lambda item: (item[0], item[1]))
     return [(repo, -negative, index_list) for negative, _, repo, index_list in scored[:limit]]
+
+
+def _owner(repo: Repo) -> str:
+    return repo.full_name.split("/", 1)[0].lower()
+
+
+def _missing_from_own(found: Sequence[Repo], own: Sequence[Repo], username: str) -> bool:
+    """True when search found a repository of an owner we list but don't have.
+
+    That means the cached list predates it, e.g. a repository created after
+    the last refresh.
+    """
+    owners = {_owner(repo) for repo in own}
+    if username:
+        owners.add(username.lower())
+    if not owners:
+        return False
+    known = {repo.full_name.lower() for repo in own}
+    return any(_owner(repo) in owners and repo.full_name.lower() not in known for repo in found)
 
 
 def build(plugin: Plugin, service_for: Callable[[], RepoService]) -> Handlers:
@@ -220,8 +242,15 @@ def build(plugin: Plugin, service_for: Callable[[], RepoService]) -> Handlers:
             if not service.has_identity:
                 yield settings_prompt()
                 return
-            fetch = service.own_repos if isinstance(parsed, Own) else service.starred
-            for result in ranked(parsed.filter, await fetch(), avatars):
+            is_own = isinstance(parsed, Own)
+            fetch = service.own_repos if is_own else service.starred
+            revalidate = service.revalidate_own if is_own else service.revalidate_stars
+            results = ranked(parsed.filter, await fetch(), avatars)
+            if not results and parsed.filter and await revalidate(MISS_WAIT_SECONDS):
+                # Nothing matched: maybe the repository or star is newer than
+                # the snapshot. Look again once GitHub has been asked.
+                results = ranked(parsed.filter, await fetch(), avatars)
+            for result in results:
                 yield result
             if service.last_error is not None:
                 yield error_result(service.last_error)
@@ -237,7 +266,8 @@ def build(plugin: Plugin, service_for: Callable[[], RepoService]) -> Handlers:
             return
 
         assert isinstance(parsed, Global)
-        own_matches = ranked(parsed.text, service.own_snapshot(), avatars, OWN_MATCH_BOOST)
+        snapshot = service.own_snapshot()
+        own_matches = ranked(parsed.text, snapshot, avatars, OWN_MATCH_BOOST)
         for result in own_matches:
             yield result
         if not settings.online_search:
@@ -249,6 +279,8 @@ def build(plugin: Plugin, service_for: Callable[[], RepoService]) -> Handlers:
         except GitHubError as error:
             yield error_result(error)
             return
+        if _missing_from_own(found, snapshot, settings.username):
+            service.nudge_own()
         already_listed = {result.title for result in own_matches}
         remote = [repo for repo in found if repo.full_name not in already_listed]
         for result in ranked("", remote, avatars):

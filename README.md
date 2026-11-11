@@ -43,7 +43,7 @@ The default action keyword is `gr`.
 | --- | --- | --- |
 | GitHub username | empty | Lists that account's public repositories and stars. No token needed. |
 | Personal access token | empty | Adds private repositories and raises the API rate limit. Prefer a fine-grained token with an expiry and read-only *Metadata* access; a classic token needs no scopes, plus `read:org` for organization repositories. |
-| Cache lifetime (minutes) | 10 | How long the repository list is reused before it is refreshed in the background. |
+| Cache lifetime (minutes) | 360 | How long the repository and star lists are reused before they are refreshed in the background. A filter that matches nothing, or a search that finds one of your repositories missing from the list, refreshes it early (at most once a minute). |
 | Search all of GitHub as you type | on | Off keeps every query on this PC: only your cached repositories are searched. |
 | Show owner avatars | on | Off shows the plugin icon instead of loading avatars from GitHub. |
 
@@ -63,7 +63,7 @@ Press Shift+Enter or right-click a repository to open it in GitHub Desktop or VS
 
 ## Speed
 
-The first `/` or `*` after you set your username waits for GitHub. After that sync, your repositories and stars are kept in memory and on disk, so both answer from the local copy, even right after Flow Launcher starts. The list refreshes in the background once it is older than the cache lifetime, using conditional requests that do not count against GitHub's rate limit when nothing changed.
+The first `/` or `*` after you set your username waits for GitHub. After that sync, your repositories and stars are kept in memory and on disk, so both answer from the local copy, even right after Flow Launcher starts. The list refreshes in the background once it is older than the cache lifetime, using conditional requests that do not count against GitHub's rate limit when nothing changed. Because GitHub marks a list as changed whenever any repository in it is pushed to, the lifetime is long; when a filter finds nothing, the plugin asks GitHub right away and waits up to three seconds for a fresh list.
 
 ## Privacy
 
