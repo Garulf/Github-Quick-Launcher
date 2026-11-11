@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import time
 from dataclasses import dataclass
-from typing import Any, AsyncIterator, Awaitable, Callable, Iterable, List
+from typing import Any, AsyncIterator, Awaitable, Callable, List, Optional, Sequence, Tuple
 from urllib.parse import quote_plus
 
 from pyflowlauncher import Plugin, Result
-from pyflowlauncher.utils import score_results
+from pyflowlauncher.plugin import _default_context_menu
+from pyflowlauncher.string_matcher import DEFAULT_QUERY_SEARCH_PRECISION, string_matcher
 
 from github_quick_launcher.client import (
     BadCredentials, GitHubError, NotFound, Offline, RateLimited, Repo,
@@ -19,6 +21,11 @@ PLUGIN_ICON = "icon.png"
 DEBOUNCE_SECONDS = 0.2
 PROMPT_SCORE = 1000
 OWN_MATCH_BOOST = 1000
+# Flow shows only the top handful of results, so sending every repository on
+# every keystroke only costs serialization time on both sides of the pipe.
+MAX_RESULTS = 30
+GITHUB_WEB = "https://github.com/"
+FULL_NAME_RE = re.compile(r"^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$")
 
 
 @dataclass
@@ -26,6 +33,34 @@ class Handlers:
     query: Callable[[str], AsyncIterator[Result]]
     refresh_cache: Callable[[], Awaitable[Any]]
     error_result: Callable[[GitHubError], Result]
+    context_menu: Callable[[Any], Optional[List[Result]]]
+
+
+def top_matches(
+    text: str, repos: Sequence[Repo], limit: int = MAX_RESULTS,
+) -> List[Tuple[Repo, int, Optional[List[int]]]]:
+    """Return at most ``limit`` (repo, score, highlight) tuples, best first.
+
+    Matching runs on plain strings so that Result objects are only built for
+    what is actually sent. With no text, the API order is kept.
+    """
+    if not text:
+        top = repos[:limit]
+        return [(repo, len(top) - position, None) for position, repo in enumerate(top)]
+    # Every non-space query character must appear in the name for the fuzzy
+    # matcher to succeed, so this cheap check skips most names outright.
+    needle = set(text.lower()) - {" "}
+    scored = []
+    for position, repo in enumerate(repos):
+        name = repo.full_name
+        if needle and not needle.issubset(name.lower()):
+            continue
+        match = string_matcher(
+            text, name, query_search_precision=DEFAULT_QUERY_SEARCH_PRECISION)
+        if match.matched:
+            scored.append((-match.score, position, repo, match.index_list))
+    scored.sort(key=lambda item: (item[0], item[1]))
+    return [(repo, -negative, index_list) for negative, _, repo, index_list in scored[:limit]]
 
 
 def build(plugin: Plugin, service_for: Callable[[], RepoService]) -> Handlers:
@@ -57,26 +92,31 @@ def build(plugin: Plugin, service_for: Callable[[], RepoService]) -> Handlers:
                    icons.copy).add_action(api.copy_to_clipboard(cli_clone)),
         ]
 
-    def repo_result(repo: Repo) -> Result:
+    def context_menu_handler(context_data: Any) -> Optional[List[Result]]:
+        # Results carry only [full_name, html_url]; the menu is built when the
+        # user actually opens it instead of being serialized with every result.
+        if (isinstance(context_data, list) and len(context_data) == 2
+                and all(isinstance(item, str) for item in context_data)):
+            full_name, html_url = context_data
+            if FULL_NAME_RE.fullmatch(full_name) and html_url.startswith(GITHUB_WEB):
+                return context_menu(Repo(full_name, "", html_url, ""))
+        return _default_context_menu(context_data)
+
+    def repo_result(repo: Repo, score: int, highlight: Optional[List[int]]) -> Result:
         return Result(
             title=repo.full_name,
             subtitle=repo.description,
             icon=repo.avatar_url or PLUGIN_ICON,
+            score=score,
             copy_text=repo.full_name,
-            context_data=context_menu(repo),
+            context_data=[repo.full_name, repo.html_url],
             rounded_icon=True,
+            title_highlight_data=highlight,
         ).add_action(api.open_url(repo.html_url))
 
-    def ranked(text: str, repos: Iterable[Repo], boost: int = 0) -> List[Result]:
-        results = [repo_result(repo) for repo in repos]
-        if text:
-            results = list(score_results(text, results))
-            for result in results:
-                result.score += boost
-            return results
-        for position, result in enumerate(results):
-            result.score = boost + len(results) - position
-        return results
+    def ranked(text: str, repos: Sequence[Repo], boost: int = 0) -> List[Result]:
+        return [repo_result(repo, boost + score, highlight)
+                for repo, score, highlight in top_matches(text, repos)]
 
     def settings_prompt() -> Result:
         return Result(
@@ -172,5 +212,6 @@ def build(plugin: Plugin, service_for: Callable[[], RepoService]) -> Handlers:
 
     plugin.add_method(query)
     plugin.add_method(refresh_cache)
+    plugin.add_method(context_menu_handler, name="context_menu")
     plugin.add_exception_handler(GitHubError, error_result)
-    return Handlers(query, refresh_cache, error_result)
+    return Handlers(query, refresh_cache, error_result, context_menu_handler)
