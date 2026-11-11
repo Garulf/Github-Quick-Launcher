@@ -6,7 +6,6 @@ from typing import List, Optional
 from pyflowlauncher import Plugin
 from pyflowlauncher.jsonrpc import _json_default
 from pyflowlauncher.launcher import FlowLauncherV2
-from pyflowlauncher.plugin import _default_context_menu
 
 from github_quick_launcher import handlers
 from github_quick_launcher.client import GitHubError, NotFound, Offline, RateLimited, Repo
@@ -139,10 +138,7 @@ async def test_repo_result_opens_url_and_carries_a_context_menu(monkeypatch):
     assert repo_result.json_rpc_action["Parameters"][0] == FLOW.html_url
     assert repo_result.copy_text == "me/flow-thing"
     assert repo_result.icon == "https://a/me"
-    assert [item.title for item in repo_result.context_data] == [
-        "Open in browser", "Open with GitHub Desktop", "Open in VS Code", "Copy full name",
-        "Copy URL", "Clone with HTTPS", "Clone with SSH", "Clone with GitHub CLI",
-    ]
+    assert repo_result.context_data == [FLOW.full_name, FLOW.html_url]
 
 
 async def test_refresh_command_offers_a_refresh_action(monkeypatch):
@@ -192,13 +188,49 @@ async def test_refresh_without_identity_asks_for_settings_instead(monkeypatch):
     assert service.refreshed is False
 
 
-async def test_context_menu_round_trips_through_json(monkeypatch):
+async def test_context_menu_is_built_lazily_from_the_echoed_context_data(monkeypatch):
+    built = build(FakeService(), monkeypatch)
+    results = [r async for r in built.query("/flow")]
+
+    wire = json.loads(json.dumps(results[0].to_json(), default=_json_default))
+    menu = built.context_menu(wire["ContextData"])
+
+    assert [item.title for item in menu] == [
+        "Open in browser", "Open with GitHub Desktop", "Open in VS Code", "Copy full name",
+        "Copy URL", "Clone with HTTPS", "Clone with SSH", "Clone with GitHub CLI",
+    ]
+    assert menu[0].json_rpc_action["Method"].endswith("OpenUrl")
+    assert menu[0].json_rpc_action["Parameters"][0] == FLOW.html_url
+
+
+def test_context_menu_rejects_data_that_is_not_a_github_repo():
+    built = handlers.build(Plugin(launcher=FlowLauncherV2()), lambda: FakeService())
+    assert built.context_menu(["me/x", "https://evil.example/me/x"]) == []
+    assert built.context_menu(["../x", "https://github.com/../x"]) == []
+
+
+async def test_a_result_stays_small_on_the_wire(monkeypatch):
     results = [r async for r in build(FakeService(), monkeypatch).query("/flow")]
-    repo_result = results[0]
+    wire = json.dumps(results[0].to_json(), default=_json_default)
+    assert len(wire) < 1024
 
-    wire = json.loads(json.dumps(repo_result.to_json(), default=_json_default))
-    rebuilt = _default_context_menu(wire["ContextData"])
 
-    assert len(rebuilt) == 8
-    assert rebuilt[0].json_rpc_action["Method"].endswith("OpenUrl")
-    assert rebuilt[0].json_rpc_action["Parameters"][0] == FLOW.html_url
+async def test_listing_is_capped_to_the_result_limit(monkeypatch):
+    service = FakeService()
+    service.own = [Repo(f"me/repo-{i}", "", f"https://github.com/me/repo-{i}", "")
+                   for i in range(handlers.MAX_RESULTS + 20)]
+    built = build(service, monkeypatch)
+
+    listed = await titles(built, "/")
+    filtered = await titles(built, "/repo")
+
+    assert len(listed) == handlers.MAX_RESULTS
+    assert listed[0] == "me/repo-0"
+    assert len(filtered) == handlers.MAX_RESULTS
+
+
+def test_top_matches_keeps_api_order_on_ties_and_skips_non_matches():
+    repos = [OTHER, FLOW, STAR]
+    names = [repo.full_name for repo, _, _ in handlers.top_matches("flow", repos)]
+    assert "me/other" not in names
+    assert set(names) == {"me/flow-thing", "them/starred-flow"}
