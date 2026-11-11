@@ -33,9 +33,11 @@ class RepoStore:
 
     def __init__(
         self, path: Path, ttl: float, fetch: Fetch, clock: Callable[[], float] = time.time,
+        miss_cooldown: float = MISS_COOLDOWN_SECONDS,
     ) -> None:
         self._path = path
         self._ttl = ttl
+        self._miss_cooldown = miss_cooldown
         self._fetch = fetch
         self._clock = clock
         self._repos: List[Repo] = []
@@ -70,7 +72,15 @@ class RepoStore:
             until = max(until, float(self.last_error.reset_at))
         return self._clock() < until
 
+    def _forget_settled_failure(self) -> None:
+        # An early revalidation can fail while the list is still fresh.
+        # Nothing retries a fresh list, so without this its error would be
+        # reported on every query until the list finally went stale.
+        if self.last_error is not None and not self.is_stale and not self._in_cooldown:
+            self.last_error, self._failed_at = None, None
+
     async def repos(self) -> List[Repo]:
+        self._forget_settled_failure()
         cooling = self._in_cooldown
         if self.is_stale and not cooling:
             self._start_refresh()
@@ -84,6 +94,7 @@ class RepoStore:
         return list(self._repos)
 
     def snapshot(self) -> List[Repo]:
+        self._forget_settled_failure()
         if self.is_stale and not self._in_cooldown:
             self._start_refresh()
         return list(self._repos)
@@ -109,7 +120,7 @@ class RepoStore:
             return False
         now = self._clock()
         for last in (self._revalidated_at, self._fetched_at):
-            if last is not None and now - last < MISS_COOLDOWN_SECONDS:
+            if last is not None and now - last < self._miss_cooldown:
                 return False
         return True
 
@@ -130,12 +141,15 @@ class RepoStore:
         """Revalidate now and wait up to ``wait`` seconds for the result.
 
         Returns True only when a refresh finished successfully in time, so
-        the caller knows a second look at the snapshot is worthwhile.
+        the caller knows a second look at the snapshot is worthwhile. A
+        refresh that is already running is waited for as well: the query
+        that started it is usually superseded by the next keystroke, and
+        the last keystroke is the one whose answer stays on screen.
         """
-        if not self.nudge():
-            return False
+        self.nudge()
         task = self._refresh_task
-        assert task is not None
+        if task is None or task.done():
+            return False
         try:
             # shield: a timeout or a superseded query must not cancel the
             # refresh itself; it still lands for the next keystroke.

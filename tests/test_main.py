@@ -134,7 +134,7 @@ async def test_every_replaced_service_stops_writing_its_snapshot(
         return Listing([], None)
 
     monkeypatch.setattr(first._client, "list_repos", slow_list)
-    first.own_snapshot()  # a refresh is now in flight in the first service
+    first.own.snapshot()  # a refresh is now in flight in the first service
 
     _set_settings(clean_main, {**token, "cache_ttl_minutes": "30"})
     clean_main._service_for_current_settings()

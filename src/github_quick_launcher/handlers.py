@@ -12,7 +12,7 @@ from pyflowlauncher.string_matcher import DEFAULT_QUERY_SEARCH_PRECISION, string
 
 from github_quick_launcher import avatar
 from github_quick_launcher.client import (
-    BadCredentials, GitHubError, NotFound, Offline, RateLimited, Repo,
+    MAX_PAGES, PER_PAGE, BadCredentials, GitHubError, NotFound, Offline, RateLimited, Repo,
 )
 from github_quick_launcher.query import Clear, Global, Own, Refresh, Stars, UserSearch, route
 from github_quick_launcher.service import RepoService
@@ -76,19 +76,20 @@ def _owner(repo: Repo) -> str:
     return repo.full_name.split("/", 1)[0].lower()
 
 
-def _missing_from_own(found: Sequence[Repo], own: Sequence[Repo], username: str) -> bool:
-    """True when search found a repository of an owner we list but don't have.
+def _missing_from_own(found: Sequence[Repo], own: Sequence[Repo], login: str) -> bool:
+    """True when search found a repository of ``login`` that the list lacks.
 
     That means the cached list predates it, e.g. a repository created after
-    the last refresh.
+    the last refresh. Only the account's own repositories count: the list
+    holds a few repositories of other owners too (ones the account
+    collaborates on), never all of them. A list cut off at the page cap is
+    never complete either, so it gives no signal.
     """
-    owners = {_owner(repo) for repo in own}
-    if username:
-        owners.add(username.lower())
-    if not owners:
+    if not login or len(own) >= MAX_PAGES * PER_PAGE:
         return False
+    owner = login.lower()
     known = {repo.full_name.lower() for repo in own}
-    return any(_owner(repo) in owners and repo.full_name.lower() not in known for repo in found)
+    return any(_owner(repo) == owner and repo.full_name.lower() not in known for repo in found)
 
 
 def build(plugin: Plugin, service_for: Callable[[], RepoService]) -> Handlers:
@@ -244,17 +245,15 @@ def build(plugin: Plugin, service_for: Callable[[], RepoService]) -> Handlers:
             return
 
         if isinstance(parsed, (Own, Stars)):
-            if not service.has_identity:
+            store = service.own if isinstance(parsed, Own) else service.stars
+            if store is None:
                 yield settings_prompt()
                 return
-            is_own = isinstance(parsed, Own)
-            fetch = service.own_repos if is_own else service.starred
-            revalidate = service.revalidate_own if is_own else service.revalidate_stars
-            results = ranked(parsed.filter, await fetch(), avatars)
-            if not results and parsed.filter and await revalidate(MISS_WAIT_SECONDS):
+            results = ranked(parsed.filter, await store.repos(), avatars)
+            if not results and parsed.filter and await store.revalidate(MISS_WAIT_SECONDS):
                 # Nothing matched: maybe the repository or star is newer than
                 # the snapshot. Look again once GitHub has been asked.
-                results = ranked(parsed.filter, await fetch(), avatars)
+                results = ranked(parsed.filter, await store.repos(), avatars)
             for result in results:
                 yield result
             if service.last_error is not None:
@@ -271,15 +270,22 @@ def build(plugin: Plugin, service_for: Callable[[], RepoService]) -> Handlers:
             return
 
         assert isinstance(parsed, Global)
-        snapshot = service.own_snapshot()
+        own = service.own
+        snapshot = own.snapshot() if own is not None else []
         own_matches = ranked(parsed.text, snapshot, avatars, OWN_MATCH_BOOST)
+        long_enough = len(parsed.text.replace(" ", "")) >= MIN_SEARCH_CHARS
+        if (not settings.online_search and not own_matches and long_enough and own is not None
+                and await own.revalidate(MISS_WAIT_SECONDS)):
+            # With online search off this is a filter over the own list and
+            # no search result will ever point out a repository it lacks.
+            own_matches = ranked(parsed.text, own.snapshot(), avatars, OWN_MATCH_BOOST)
         for result in own_matches:
             yield result
         if not settings.online_search:
             if not own_matches:
                 yield online_search_disabled()
             return
-        if len(parsed.text.replace(" ", "")) < MIN_SEARCH_CHARS:
+        if not long_enough:
             if not own_matches:
                 yield keep_typing()
             return
@@ -288,8 +294,8 @@ def build(plugin: Plugin, service_for: Callable[[], RepoService]) -> Handlers:
         except GitHubError as error:
             yield error_result(error)
             return
-        if _missing_from_own(found, snapshot, settings.username):
-            service.nudge_own()
+        if own is not None and _missing_from_own(found, snapshot, service.own_login()):
+            own.nudge()
         already_listed = {result.title for result in own_matches}
         remote = [repo for repo in found if repo.full_name not in already_listed]
         for result in ranked("", remote, avatars):

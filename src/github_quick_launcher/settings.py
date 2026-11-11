@@ -9,6 +9,10 @@ from typing import Any, Mapping, Optional
 # repository is pushed to, so a short TTL mostly refetches unchanged names.
 # Misses trigger an early revalidation instead (see RepoStore.nudge).
 DEFAULT_TTL_MINUTES = 360
+# Flow saves a template's default with the rest of the settings, so every
+# install from before the lifetime was raised has "10" stored. Reading that
+# as "never changed" is what lets the new default reach them.
+LEGACY_DEFAULT_TTL_MINUTES = 10
 LOGIN_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$")
 
 
@@ -18,6 +22,11 @@ def _positive_int(value: Any, default: int) -> int:
     except (TypeError, ValueError):
         return default
     return number if number > 0 else default
+
+
+def _ttl_minutes(value: Any) -> int:
+    minutes = _positive_int(value, DEFAULT_TTL_MINUTES)
+    return DEFAULT_TTL_MINUTES if minutes == LEGACY_DEFAULT_TTL_MINUTES else minutes
 
 
 def _flag(value: Any, default: bool) -> bool:
@@ -55,7 +64,7 @@ class Settings:
         return cls(
             username=_clean_username(raw.get("username")),
             token=str(raw.get("token") or "").strip(),
-            cache_ttl_minutes=_positive_int(raw.get("cache_ttl_minutes"), DEFAULT_TTL_MINUTES),
+            cache_ttl_minutes=_ttl_minutes(raw.get("cache_ttl_minutes")),
             online_search=_flag(raw.get("online_search"), True),
             show_avatars=_flag(raw.get("show_avatars"), True),
         )

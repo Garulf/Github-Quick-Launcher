@@ -219,3 +219,8 @@ async def test_transport_failure_raises_offline(client, httpx_mock):
     httpx_mock.add_exception(httpx.ConnectError("no route"))
     with pytest.raises(Offline):
         await client.list_repos("/user/repos")
+
+
+async def test_login_names_the_account_behind_the_token(client, httpx_mock):
+    httpx_mock.add_response(url=f"{API}/user", json={"login": "octocat", "id": 1})
+    assert await client.login() == "octocat"

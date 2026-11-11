@@ -182,6 +182,11 @@ class GitHubClient:
             return Listing(repos, None)
         return Listing(repos, ETAG_PREFIX + ETAG_SEPARATOR.join(tag for tag in etags if tag))
 
+    async def login(self) -> str:
+        """The account the token belongs to."""
+        response = await self._get("/user")
+        return str(response.json().get("login") or "")
+
     async def search(self, q: str, limit: int = SEARCH_LIMIT) -> List[Repo]:
         response = await self._get("/search/repositories", {"q": q, "per_page": limit})
         return [Repo.from_api(item) for item in response.json()["items"]]
